@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Progress & Gantt Sync (Cloud Edition)</title>
+    <title>進捗・ガントチャート同期 (クラウド版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -143,7 +143,7 @@
                     <i class="fa-solid fa-chart-gantt text-4xl"></i>
                 </div>
                 <h2 class="text-3xl font-black text-slate-900 tracking-wider">システム認証</h2>
-                <p class="text-sm tracking-widest text-slate-400 mt-3 uppercase font-bold">Progress & Gantt & Todo Sync</p>
+                <p class="text-sm tracking-widest text-slate-400 mt-3 uppercase font-bold">進捗・ガントチャート・TODO同期</p>
             </div>
             
             <div class="space-y-6">
@@ -183,33 +183,33 @@
                 <div class="bg-cyan-500 text-white p-3 rounded-lg shadow-[0_0_15px_rgba(14,165,233,0.3)] text-xl"><i class="fa-solid fa-cloud"></i></div>
                 <div>
                     <h1 class="text-2xl font-black text-slate-900 tracking-tighter uppercase italic leading-none">
-                        Sync <span class="text-cyan-600">Cloud</span>
+                        同期 <span class="text-cyan-600">クラウド</span>
                     </h1>
-                    <span class="text-[11px] font-mono font-bold text-cyan-600/60 uppercase tracking-[0.2em]">Operational_Matrix_v11.6</span>
+                    <span class="text-[11px] font-mono font-bold text-cyan-600/60 uppercase tracking-[0.2em]">業務運用マトリクス v11.6</span>
                 </div>
             </div>
             
             <div class="flex items-center gap-6">
                 <div class="bg-slate-100 p-1.5 rounded-xl flex gap-1 border-2 border-slate-200">
-                    <button onclick="switchView('kanban')" id="tab-kanban" class="px-6 py-2.5 rounded-lg text-sm font-mono font-black uppercase tracking-widest transition-all bg-white text-cyan-600 shadow-md border-2 border-cyan-500/20">Kanban</button>
-                    <button onclick="switchView('gantt')" id="tab-gantt" class="px-6 py-2.5 rounded-lg text-sm font-mono font-black uppercase tracking-widest transition-all text-slate-400 hover:text-cyan-600 hover:bg-white">Gantt</button>
-                    <button onclick="switchView('weekly')" id="tab-weekly" class="px-6 py-2.5 rounded-lg text-sm font-mono font-black uppercase tracking-widest transition-all text-slate-400 hover:text-cyan-600 hover:bg-white">Weekly</button>
+                    <button onclick="switchView('kanban')" id="tab-kanban" class="px-6 py-2.5 rounded-lg text-sm font-mono font-black uppercase tracking-widest transition-all bg-white text-cyan-600 shadow-md border-2 border-cyan-500/20">カンバン</button>
+                    <button onclick="switchView('gantt')" id="tab-gantt" class="px-6 py-2.5 rounded-lg text-sm font-mono font-black uppercase tracking-widest transition-all text-slate-400 hover:text-cyan-600 hover:bg-white">ガントチャート</button>
+                    <button onclick="switchView('weekly')" id="tab-weekly" class="px-6 py-2.5 rounded-lg text-sm font-mono font-black uppercase tracking-widest transition-all text-slate-400 hover:text-cyan-600 hover:bg-white">週報</button>
                 </div>
                 <div class="h-8 w-0.5 bg-slate-200"></div>
                 <div class="flex items-center gap-2">
                     <button onclick="openProjectModal()" class="text-sm font-mono font-black text-slate-500 hover:text-cyan-600 transition-all uppercase px-3 py-2">
-                        <i class="fa-solid fa-folder-plus mr-1.5"></i> Project
+                        <i class="fa-solid fa-folder-plus mr-1.5"></i> 案件追加
                     </button>
                     <button onclick="openCalendarModal()" class="text-sm font-mono font-black text-slate-500 hover:text-cyan-600 transition-all uppercase px-3 py-2">
-                        <i class="fa-solid fa-calendar-days mr-1.5"></i> Calendar
+                        <i class="fa-solid fa-calendar-days mr-1.5"></i> カレンダー設定
                     </button>
                     <button onclick="openTaskModal()" class="btn-cyber-blue px-8 py-3 rounded-lg text-sm font-black transition-all flex items-center gap-3 uppercase tracking-widest shadow-md">
-                        <i class="fa-solid fa-plus text-lg"></i> New_Task_Entry
+                        <i class="fa-solid fa-plus text-lg"></i> 新規タスク登録
                     </button>
                 </div>
                 <div class="h-8 w-0.5 bg-slate-200"></div>
                 <button onclick="logoutUser()" class="text-sm font-mono font-black text-slate-400 hover:text-fuchsia-600 transition-all flex items-center gap-2 uppercase">
-                    <i class="fa-solid fa-power-off"></i> Exit
+                    <i class="fa-solid fa-power-off"></i> ログアウト
                 </button>
             </div>
         </div>
@@ -300,11 +300,11 @@
             <div id="print-title-area">
                 <div class="flex justify-between items-end mb-6 border-b-4 border-slate-900 pb-4">
                     <div>
-                        <h1 class="text-4xl font-black text-slate-900">WEEKLY_ACCESS_LOG</h1>
+                        <h1 class="text-4xl font-black text-slate-900">週報スケジュールログ</h1>
                         <p id="print-date-range" class="text-2xl text-cyan-600 font-black mt-2"></p>
                     </div>
                     <div class="text-right text-base text-slate-500 font-mono">
-                        Timestamp: <span id="print-current-date-weekly"></span>
+                        出力日時: <span id="print-current-date-weekly"></span>
                     </div>
                 </div>
             </div>
@@ -424,7 +424,7 @@
 
         <div id="project-modal" class="bg-white border-2 border-slate-200 rounded-3xl shadow-2xl w-full max-w-6xl max-h-[95vh] flex flex-col hidden">
             <div class="px-8 py-6 border-b-2 border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-3xl">
-                <h2 class="text-base font-black text-cyan-700 uppercase tracking-[0.3em] italic" id="project-modal-title">Project_Control_Node</h2>
+                <h2 class="text-base font-black text-cyan-700 uppercase tracking-[0.3em] italic" id="project-modal-title">案件管理設定</h2>
                 <div class="flex gap-4">
                     <button id="btn-save-proj-tmpl" onclick="saveProjectAsTemplate()" class="hidden text-xs font-mono font-black text-cyan-600 border-2 border-cyan-100 bg-cyan-50 px-4 py-2 rounded-lg hover:bg-cyan-100 transition-all uppercase tracking-widest shadow-sm">
                         <i class="fa-solid fa-bookmark mr-2"></i>テンプレートとして保存
@@ -479,7 +479,7 @@
 
         <div id="calendar-modal" class="bg-white border-2 border-slate-200 rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col hidden">
             <div class="px-8 py-6 border-b-2 border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-3xl">
-                <h2 class="text-base font-black text-cyan-700 uppercase tracking-[0.3em] italic">Temporal_Shift_Matrix</h2>
+                <h2 class="text-base font-black text-cyan-700 uppercase tracking-[0.3em] italic">休業日カレンダー設定</h2>
                 <button onclick="closeModal('calendar-modal')" class="text-slate-300 hover:text-fuchsia-500 transition-all"><i class="fa-solid fa-xmark text-2xl"></i></button>
             </div>
             <div class="p-8 overflow-y-auto flex-1 bg-white">
@@ -540,7 +540,7 @@
         <div id="dialog-modal" class="bg-white border-4 border-slate-100 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.1)] w-full max-w-lg hidden transform transition-all duration-300 scale-95 opacity-0 z-[60]">
             <div class="p-10 text-center bg-white">
                 <div id="dialog-icon" class="mx-auto flex items-center justify-center h-20 w-20 rounded-full mb-8 border-4 transition-all duration-700 shadow-sm"></div>
-                <h3 class="text-xl font-black text-slate-900 uppercase tracking-[0.2em] mb-4" id="dialog-title">System_Alert</h3>
+                <h3 class="text-xl font-black text-slate-900 uppercase tracking-[0.2em] mb-4" id="dialog-title">システム警告</h3>
                 <div class="mt-6 font-mono"><p class="text-sm text-slate-500 font-bold whitespace-pre-wrap leading-loose" id="dialog-message"></p></div>
             </div>
             <div class="px-10 py-8 border-t-2 border-slate-50 flex justify-center gap-5 bg-slate-50 rounded-b-3xl" id="dialog-buttons"></div>
@@ -680,7 +680,7 @@
             });
 
             if (filtered.length === 0) {
-                container.innerHTML = `<div class="col-span-full py-12 text-center text-slate-600 font-mono text-xs uppercase tracking-widest italic">No_Nodes_Found_in_Registry</div>`;
+                container.innerHTML = `<div class="col-span-full py-12 text-center text-slate-600 font-mono text-xs uppercase tracking-widest italic">登録されている案件はありません</div>`;
                 return;
             }
 
@@ -697,13 +697,13 @@
                         <div class="flex justify-between items-start mb-3">
                             <div class="w-3 h-3 rounded-full shadow-[0_0_8px_${p.color}]" style="background-color: ${p.color}"></div>
                             <div class="flex items-center gap-2">
-                                ${isCompleted ? '<span class="text-[9px] bg-slate-950 text-slate-500 px-2 py-0.5 rounded font-black border border-slate-800 uppercase tracking-tighter">Archived</span>' : ''}
+                                ${isCompleted ? '<span class="text-[9px] bg-slate-950 text-slate-500 px-2 py-0.5 rounded font-black border border-slate-800 uppercase tracking-tighter">アーカイブ済</span>' : ''}
                                 ${isSelected ? '<i class="fa-solid fa-circle-check neon-text-blue text-xl"></i>' : '<div class="w-5 h-5 rounded-full border-2 border-slate-700 bg-slate-950"></div>'}
                             </div>
                         </div>
-                        <h3 class="font-black ${isSelected ? 'neon-text-blue' : 'text-slate-300'} text-xs mb-3 line-clamp-2 min-h-[2.5rem] uppercase tracking-tight">${p.name}${isCompleted ? ' [OFFLINE]' : ''}</h3>
+                        <h3 class="font-black ${isSelected ? 'neon-text-blue' : 'text-slate-300'} text-xs mb-3 line-clamp-2 min-h-[2.5rem] uppercase tracking-tight">${p.name}${isCompleted ? ' [完了]' : ''}</h3>
                         <div class="flex items-center text-[10px] text-slate-500 gap-3 uppercase tracking-widest">
-                            <span><i class="fa-solid fa-microchip mr-1 text-cyan-600"></i>${taskCount} Units</span>
+                            <span><i class="fa-solid fa-microchip mr-1 text-cyan-600"></i>${taskCount} ユニット</span>
                         </div>
                     </div>
                 `;
@@ -997,7 +997,7 @@
             if (!container) return;
             
             if (state.companyHolidays.length === 0) {
-                container.innerHTML = '<p class="text-xs text-slate-600 italic py-8 text-center font-mono uppercase tracking-widest">No_System_Overrides_Detected</p>';
+                container.innerHTML = '<p class="text-xs text-slate-600 italic py-8 text-center font-mono uppercase tracking-widest">設定された休業日はありません</p>';
                 return;
             }
 
@@ -1148,14 +1148,14 @@
                             </div>
                             <div class="text-right">
                                 <div class="text-[10px] text-gray-400">出力日: ${new Date().toLocaleDateString('ja-JP')}</div>
-                                <div class="text-xl font-black text-indigo-600 mt-1">${progressPercent}% <span class="text-[10px] font-normal text-gray-400">COMPLETE</span></div>
+                                <div class="text-xl font-black text-indigo-600 mt-1">${progressPercent}% <span class="text-[10px] font-normal text-gray-400">完了</span></div>
                             </div>
                         </div>
                         <div class="w-full bg-gray-100 rounded-full h-2 mb-3 overflow-hidden border border-gray-200">
                             <div class="bg-indigo-600 h-2" style="width: ${progressPercent}%"></div>
                         </div>
                         <div class="flex flex-wrap gap-2">
-                            <div class="text-[10px] font-bold text-gray-400 mr-2 self-center uppercase tracking-widest">Key Milestones:</div>
+                            <div class="text-[10px] font-bold text-gray-400 mr-2 self-center uppercase tracking-widest">主要マイルストーン:</div>
                             ${msHtml || '<span class="text-[10px] text-gray-300 italic">設定なし</span>'}
                         </div>
                     </div>
@@ -1482,7 +1482,7 @@
             const renderTaskGroup = (task, isOpen) => {
                 const project = state.projects.find(p => p.id === task.projectId);
                 const pColor = project ? project.color : '#9ca3af';
-                const pName = project ? project.name : 'Unknown_Source';
+                const pName = project ? project.name : '所属なし';
 
                 const overdue = isOverdue(task);
                 const titleClass = overdue ? 'text-fuchsia-700' : 'text-slate-800';
@@ -1886,14 +1886,14 @@
             if (onCanc) {
                 const c = document.createElement('button');
                 c.className = "px-6 py-2.5 border border-slate-700 rounded-lg text-xs font-bold text-slate-500 hover:bg-slate-800 transition-all uppercase tracking-widest";
-                c.innerText = "Abort_Command";
+                c.innerText = "キャンセル";
                 c.onclick = () => { closeModal('dialog-modal'); onCanc(); };
                 b.appendChild(c);
             }
             const o = document.createElement('button');
             const btnClass = type === 'error' ? 'neon-border-pink text-fuchsia-400 bg-fuchsia-500/5 hover:bg-fuchsia-500/20' : 'btn-cyber-blue';
             o.className = `px-8 py-2.5 rounded-lg text-xs font-black transition-all uppercase tracking-widest ${btnClass}`;
-            o.innerText = onCanc ? "Confirm_Execute" : "Acknowledge";
+            o.innerText = onCanc ? "実行する" : "了解";
             o.onclick = () => { closeModal('dialog-modal'); if(onConf) onConf(); };
             b.appendChild(o);
 
@@ -2689,9 +2689,9 @@
             }
 
             const columns = [
-                { id: 'todo', title: 'BACKLOG', icon: 'fa-list-ul', color: 'slate' },
-                { id: 'in_progress', title: 'IN_PRODUCTION', icon: 'fa-spinner', color: 'cyan' },
-                { id: 'done', title: 'DELIVERED', icon: 'fa-check-circle', color: 'fuchsia' }
+                { id: 'todo', title: '未着手', icon: 'fa-list-ul', color: 'slate' },
+                { id: 'in_progress', title: '進行中', icon: 'fa-spinner', color: 'cyan' },
+                { id: 'done', title: '完了', icon: 'fa-check-circle', color: 'fuchsia' }
             ];
 
             columns.forEach(col => {
@@ -2740,11 +2740,11 @@
                     
                     let alertBadge = '';
                     if (isComp) {
-                        alertBadge = `<div class="text-slate-500 text-[10px] font-mono font-black mb-3 bg-slate-100 px-2 py-1 rounded border border-slate-200 inline-block uppercase tracking-tighter"><i class="fa-solid fa-box-archive mr-1"></i>Archived</div>`;
+                        alertBadge = `<div class="text-slate-500 text-[10px] font-mono font-black mb-3 bg-slate-100 px-2 py-1 rounded border border-slate-200 inline-block uppercase tracking-tighter"><i class="fa-solid fa-box-archive mr-1"></i>アーカイブ済</div>`;
                     } else if (overdue) {
-                        alertBadge = `<div class="text-fuchsia-600 text-[10px] font-mono font-black mb-3 bg-fuchsia-50 px-2 py-1 rounded border border-fuchsia-200 inline-block uppercase tracking-tighter"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Critical_Delay</div>`;
+                        alertBadge = `<div class="text-fuchsia-600 text-[10px] font-mono font-black mb-3 bg-fuchsia-50 px-2 py-1 rounded border border-fuchsia-200 inline-block uppercase tracking-tighter"><i class="fa-solid fa-triangle-exclamation mr-1"></i>納期遅れ</div>`;
                     } else if (delayed) {
-                        alertBadge = `<div class="text-amber-600 text-[10px] font-mono font-black mb-3 bg-amber-50 px-2 py-1 rounded border border-amber-200 inline-block uppercase tracking-tighter"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Pending_Start</div>`;
+                        alertBadge = `<div class="text-amber-600 text-[10px] font-mono font-black mb-3 bg-amber-50 px-2 py-1 rounded border border-amber-200 inline-block uppercase tracking-tighter"><i class="fa-solid fa-triangle-exclamation mr-1"></i>着手遅れ</div>`;
                     }
 
                     const dateColor = overdue ? 'text-fuchsia-600' : (delayed ? 'text-amber-600' : 'text-slate-400');
@@ -2756,7 +2756,7 @@
                                onclick="event.stopPropagation(); toggleTaskSelection('${task.id}', this.checked)" ${isSelected ? 'checked' : ''}>
                         
                         <div class="flex justify-between items-start mb-3 pl-4 pr-10">
-                            <span class="text-[10px] font-mono font-black px-2 py-1 rounded border border-slate-100 bg-slate-50 text-slate-500 truncate max-w-full uppercase tracking-tighter">${project ? project.name : 'Unknown_Source'}</span>
+                            <span class="text-[10px] font-mono font-black px-2 py-1 rounded border border-slate-100 bg-slate-50 text-slate-500 truncate max-w-full uppercase tracking-tighter">${project ? project.name : '所属なし'}</span>
                         </div>
                         <div class="pl-4">
                             ${alertBadge}
@@ -2933,7 +2933,7 @@
                 <div class="flex border-y-2 border-slate-200 bg-slate-100/50 backdrop-blur-sm shadow-sm ${projOpacity}">
                     <div style="width: ${currentHeaderWidth}px; min-width: ${currentHeaderWidth}px;" class="p-4 border-r-2 border-slate-200 ${stickyClass} flex items-center bg-slate-50/80 font-black text-slate-800 text-sm font-mono uppercase tracking-tight italic">
                         <div class="w-4 h-4 rounded-sm mr-3 shadow-md" style="background-color: ${proj.color}"></div>
-                        <span class="truncate">${proj.name}${isComp ? ' [OFFLINE]' : ''}</span>
+                        <span class="truncate">${proj.name}${isComp ? ' [完了]' : ''}</span>
                     </div>
                     <div class="relative flex-1 py-4" style="width: ${totalDays * currentCellWidth}px; height: 56px;">
                 `;
@@ -3053,8 +3053,8 @@
                 }
             });
             let html = Array.from(legendMap.values()).join('<span class="mx-2 text-slate-800">|</span>');
-            if(!html) html = '<span class="text-slate-600">NO_DATA_NODES_ACTIVE</span>';
-            document.getElementById('gantt-legend').innerHTML = `<span class="font-bold text-slate-300 mr-3 uppercase tracking-widest"><i class="fa-solid fa-tags mr-2 text-cyan-500"></i>Registry_Legend:</span>${html}`;
+            if(!html) html = '<span class="text-slate-600">有効な案件データはありません</span>';
+            document.getElementById('gantt-legend').innerHTML = `<span class="font-bold text-slate-300 mr-3 uppercase tracking-widest"><i class="fa-solid fa-tags mr-2 text-cyan-500"></i>マイルストーン凡例:</span>${html}`;
         }
 
         function getGanttDateRange(rangeType, filteredTasks, filteredProjects = []) {
