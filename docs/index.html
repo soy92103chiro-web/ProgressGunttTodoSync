@@ -874,9 +874,10 @@
             updateProjectTemplatesDropdown();
             updateTaskTemplatesDropdown();
             
-            if (state.currentView === 'kanban') renderKanban(); 
+            if (state.currentView === 'kanban') renderKanban();
             else if (state.currentView === 'gantt') renderGantt();
             else if (state.currentView === 'weekly') renderWeekly();
+            else if (state.currentView === 'dashboard') renderDashboard();
         }
 
         const defaultMilestonesTemplate = [
