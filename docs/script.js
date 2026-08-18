@@ -1047,7 +1047,6 @@
                 let blocksHtml = '';
 
                 state.tasks.forEach(t => {
-                    if (pId !== 'all' && t.projectId !== pId) return;
                     if (!state.showCompletedProjects && isProjectCompleted(t.projectId)) return;
 
                     const proj = state.projects.find(p => p.id === t.projectId);
