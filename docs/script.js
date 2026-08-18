@@ -896,11 +896,9 @@
             }).forEach(t => {
                 let hasUnassigned = false;
                 t.subtasks.forEach(st => {
-                    if (st.completed) return;
-                    const completedH = st.hours * (st.progress / 100);
-                    const assignedH = st.assignments.reduce((sum, a) => sum + a.duration * 0.5, 0);
-                    const remH = parseFloat(Math.max(0, st.hours - completedH - assignedH).toFixed(1));
-                    if (remH > 0) hasUnassigned = true;
+                    if (!st.completed) {
+                        hasUnassigned = true;
+                    }
                 });
 
                 if (!hasUnassigned) return;
@@ -918,14 +916,21 @@
                 else irrelevantTasks.push(t);
             });
 
-            const sortByDueDate = (a, b) => {
+            const sortByProjectAndDueDate = (a, b) => {
+                const pA = state.projects.find(p => p.id === a.projectId);
+                const pB = state.projects.find(p => p.id === b.projectId);
+                const nameA = pA ? pA.name : 'zzzz';
+                const nameB = pB ? pB.name : 'zzzz';
+                if (nameA !== nameB) {
+                    return nameA.localeCompare(nameB, 'ja');
+                }
                 const da = a.dueDate ? new Date(a.dueDate).getTime() : 9999999999999;
                 const db = b.dueDate ? b.dueDate : 9999999999999;
                 return da - db;
             };
 
-            relevantTasks.sort(sortByDueDate);
-            irrelevantTasks.sort(sortByDueDate);
+            relevantTasks.sort(sortByProjectAndDueDate);
+            irrelevantTasks.sort(sortByProjectAndDueDate);
 
             const poolContainer = document.getElementById('weekly-unassigned-pool');
             poolContainer.innerHTML = '';
@@ -962,8 +967,7 @@
                 task.subtasks.forEach(st => {
                     if (st.completed) return;
                     const completedH = st.hours * ((st.progress||0) / 100);
-                    const assignedH = st.assignments.reduce((sum, a) => sum + a.duration * 0.5, 0);
-                    const remH = parseFloat(Math.max(0, st.hours - completedH - assignedH).toFixed(1));
+                    const remH = parseFloat(Math.max(0, st.hours - completedH).toFixed(1));
 
                     totalRemH += remH;
 
