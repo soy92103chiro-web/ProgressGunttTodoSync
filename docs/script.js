@@ -916,21 +916,21 @@
                 else irrelevantTasks.push(t);
             });
 
-            const sortByProjectAndDueDate = (a, b) => {
+            const sortByDueDateAndProject = (a, b) => {
+                const da = a.dueDate ? new Date(a.dueDate).getTime() : 9999999999999;
+                const db = b.dueDate ? b.dueDate : 9999999999999;
+                if (da !== db) {
+                    return da - db;
+                }
                 const pA = state.projects.find(p => p.id === a.projectId);
                 const pB = state.projects.find(p => p.id === b.projectId);
                 const nameA = pA ? pA.name : 'zzzz';
                 const nameB = pB ? pB.name : 'zzzz';
-                if (nameA !== nameB) {
-                    return nameA.localeCompare(nameB, 'ja');
-                }
-                const da = a.dueDate ? new Date(a.dueDate).getTime() : 9999999999999;
-                const db = b.dueDate ? b.dueDate : 9999999999999;
-                return da - db;
+                return nameA.localeCompare(nameB, 'ja');
             };
 
-            relevantTasks.sort(sortByProjectAndDueDate);
-            irrelevantTasks.sort(sortByProjectAndDueDate);
+            relevantTasks.sort(sortByDueDateAndProject);
+            irrelevantTasks.sort(sortByDueDateAndProject);
 
             const poolContainer = document.getElementById('weekly-unassigned-pool');
             poolContainer.innerHTML = '';
@@ -992,9 +992,10 @@
                     accDiv.innerHTML = `
                         <div class="px-4 py-3 bg-slate-50 border-b-2 border-transparent flex items-center justify-between cursor-pointer hover:bg-white transition-all" onclick="toggleAccordion('acc-${task.id}', 'icon-${task.id}')">
                             <div class="flex flex-col flex-1 pr-4">
-                                <div class="flex items-center gap-3 overflow-hidden mb-1.5">
+                                <div class="flex items-center gap-2 overflow-hidden mb-1.5">
                                     <span class="w-3 h-3 rounded-full flex-shrink-0 shadow-sm" style="background-color: ${pColor}"></span>
-                                    <span class="text-xs font-black ${titleClass} truncate font-mono uppercase tracking-tight">${task.title}</span>
+                                    <span class="text-[10px] font-bold text-slate-500 truncate shrink-0 px-1.5 py-0.5 rounded bg-slate-200/50">${pName}</span>
+                                    <span class="text-xs font-black ${titleClass} truncate font-mono uppercase tracking-tight ml-1">${task.title}</span>
                                 </div>
                                 <div class="flex justify-between items-center pl-6">
                                     <div class="text-[10px] font-bold ${dateClass} uppercase tracking-tighter">納期: ${task.dueDate ? task.dueDate.substring(5).replace('-','/') : '未設定'}</div>
