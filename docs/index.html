@@ -193,7 +193,7 @@
                 <div class="bg-slate-100 p-1.5 rounded-xl flex gap-1 border-2 border-slate-200">
                     <button onclick="switchView('kanban')" id="tab-kanban" class="px-6 py-2.5 rounded-lg text-sm font-mono font-black uppercase tracking-widest transition-all bg-white text-cyan-600 shadow-md border-2 border-cyan-500/20">カンバン</button>
                     <button onclick="switchView('gantt')" id="tab-gantt" class="px-6 py-2.5 rounded-lg text-sm font-mono font-black uppercase tracking-widest transition-all text-slate-400 hover:text-cyan-600 hover:bg-white">ガントチャート</button>
-                    <button onclick="switchView('weekly')" id="tab-weekly" class="px-6 py-2.5 rounded-lg text-sm font-mono font-black uppercase tracking-widest transition-all text-slate-400 hover:text-cyan-600 hover:bg-white">週報</button>
+                    <button onclick="switchView('weekly')" id="tab-weekly" class="px-6 py-2.5 rounded-lg text-sm font-mono font-black uppercase tracking-widest transition-all text-slate-400 hover:text-cyan-600 hover:bg-white">週間スケジュール</button>
 <button onclick="switchView(\'dashboard\')" id="tab-dashboard" class="px-6 py-2.5 rounded-lg text-sm font-mono font-black uppercase tracking-widest transition-all text-slate-400 hover:text-cyan-600 hover:bg-white">TODO(ダッシュボード)</button>
                 </div>
                 <div class="h-8 w-0.5 bg-slate-200"></div>
@@ -301,7 +301,7 @@
             <div id="print-title-area">
                 <div class="flex justify-between items-end mb-6 border-b-4 border-slate-900 pb-4">
                     <div>
-                        <h1 class="text-4xl font-black text-slate-900">週報スケジュールログ</h1>
+                        <h1 class="text-4xl font-black text-slate-900">週間スケジュール</h1>
                         <p id="print-date-range" class="text-2xl text-cyan-600 font-black mt-2"></p>
                     </div>
                     <div class="text-right text-base text-slate-500 font-mono">
@@ -312,7 +312,7 @@
 
             <div class="mb-6 flex items-center justify-between flex-shrink-0 bg-white p-6 rounded-xl border-2 border-slate-200 shadow-sm">
                 <div class="flex items-center gap-8">
-                    <h2 class="text-xl font-black text-cyan-600 italic tracking-tighter"><i class="fa-regular fa-calendar-check mr-3"></i>週報・スケジュール管理</h2>
+                    <h2 class="text-xl font-black text-cyan-600 italic tracking-tighter"><i class="fa-regular fa-calendar-check mr-3"></i>週間スケジュール</h2>
                     <div class="h-8 w-0.5 bg-slate-200"></div>
                     <div class="flex items-center gap-4">
                         <button onclick="changeWeek(-1)" class="p-2 text-slate-400 hover:text-cyan-600 transition-all"><i class="fa-solid fa-chevron-left text-xl"></i></button>

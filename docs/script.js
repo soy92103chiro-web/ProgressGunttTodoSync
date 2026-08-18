@@ -964,7 +964,6 @@
                     const completedH = st.hours * ((st.progress||0) / 100);
                     const assignedH = st.assignments.reduce((sum, a) => sum + a.duration * 0.5, 0);
                     const remH = parseFloat(Math.max(0, st.hours - completedH - assignedH).toFixed(1));
-                    if (remH <= 0) return;
 
                     totalRemH += remH;
 
@@ -1119,7 +1118,7 @@
                          ondragleave="dragWeeklyLeaveContainer(event)" 
                          ondrop="dropWeeklyContainer(event, '${dateStr}')">
                         
-                        <div class="absolute inset-0 z-0 flex flex-col pointer-events-none">
+                        <div class="absolute inset-0 z-0 pointer-events-none">
                             ${slotsHtml}
                         </div>
                         ${blocksHtml}
