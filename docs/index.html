@@ -1377,10 +1377,13 @@
         async function saveRegularMeetings() {
             const name = document.getElementById('rm-name').value || '定例会';
             const dayOfWeek = parseInt(document.getElementById('rm-day').value);
-            const duration = parseFloat(document.getElementById('rm-duration').value) || 1;
-            const weeks = parseInt(document.getElementById('rm-weeks').value) || 4;
+            const startTime = document.getElementById('rm-start-time').value || '10:00';
+            const durationH = parseFloat(document.getElementById('rm-duration').value) || 1;
 
-            // adhoc-project exists or we need to ensure it
+            const [hh, mm] = startTime.split(':').map(Number);
+            const startSlot = hh * 2 + (mm >= 30 ? 1 : 0);
+            const durationSlots = Math.round(durationH * 2);
+
             let adhocP = state.projects.find(p => p.id === 'adhoc-project');
             if (!adhocP) {
                 adhocP = { id: 'adhoc-project', name: '臨時・事務', color: '#9ca3af', milestones: [] };
@@ -1390,141 +1393,53 @@
             const today = new Date();
             today.setHours(0,0,0,0);
             
-            // Find next target day of week
+            let fyEndYear = today.getMonth() < 3 ? today.getFullYear() : today.getFullYear() + 1;
+            const fyEnd = new Date(fyEndYear, 2, 31);
+            
             let targetDate = new Date(today);
             while (targetDate.getDay() !== dayOfWeek) {
                 targetDate.setDate(targetDate.getDate() + 1);
             }
 
-            for (let i = 0; i < weeks; i++) {
+            const taskId = generateId();
+            const subtasks = [];
+
+            while (targetDate <= fyEnd) {
                 const dateStr = dateUtils.formatDate(targetDate);
-                const task = {
-                    id: generateId(),
-                    projectId: 'adhoc-project',
-                    title: name,
-                    status: 'todo',
-                    startDate: dateStr,
-                    dueDate: dateStr,
-                    totalHours: duration,
-                    notes: '',
-                    subtasks: [],
-                    assignments: [{ date: dateStr, duration: duration, isFreeBlock: false }]
-                };
-                await saveDoc('tasks', task.id, task);
+                const subtaskId = generateId();
+                subtasks.push({
+                    id: subtaskId,
+                    title: `${dateStr.substring(5).replace('-','/')} ${name}`,
+                    hours: durationH,
+                    progress: 0,
+                    completed: false,
+                    assignments: [{
+                        id: generateId(),
+                        date: dateStr,
+                        startSlot: startSlot,
+                        duration: durationSlots
+                    }],
+                    note: ''
+                });
                 targetDate.setDate(targetDate.getDate() + 7);
             }
 
+            const task = {
+                id: taskId,
+                projectId: 'adhoc-project',
+                title: `[定例] ${name}`,
+                status: 'todo',
+                startDate: dateUtils.formatDate(today),
+                dueDate: dateUtils.formatDate(fyEnd),
+                totalHours: durationH * subtasks.length,
+                notes: '年度末までの定例会',
+                subtasks: subtasks
+            };
+
+            state.tasks.push(task);
+            await saveDoc('tasks', task.id, task);
+
             closeModal('regular-meeting-modal');
-            if(state.currentView === 'weekly') renderWeekly();
-        }
-
-        function renderDashboard() {
-            const container = document.getElementById('dashboard-todo-list');
-            if (!container) return;
-
-            const todayStr = dateUtils.formatDate(new Date());
-            
-            // Find tasks due today or assigned today that are not done
-            const todayTasks = state.tasks.filter(t => {
-                if (t.status === 'done') return false;
-                const isDueToday = t.dueDate === todayStr;
-                const isAssignedToday = t.assignments && t.assignments.some(a => a.date === todayStr);
-                return isDueToday || isAssignedToday;
-            });
-
-            if (todayTasks.length === 0) {
-                container.innerHTML = '<div class="text-center text-slate-400 mt-10"><i class="fa-solid fa-mug-hot text-4xl mb-4"></i><p>今日のTODOはありません</p></div>';
-            } else {
-                container.innerHTML = todayTasks.map(t => {
-                    const proj = state.projects.find(p => p.id === t.projectId);
-                    return `
-                    <div class="bg-white p-4 rounded-xl shadow-sm border-2 border-slate-200 cursor-pointer hover:border-cyan-400 transition-all ${activeDashboardTaskId === t.id ? 'border-amber-400 shadow-md ring-2 ring-amber-100' : ''}" onclick="selectDashboardTask('${t.id}')">
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="text-[10px] font-bold text-white px-2 py-0.5 rounded shadow-sm" style="background-color: ${proj ? proj.color : '#9ca3af'}">${proj ? proj.name : ''}</span>
-                            <span class="text-xs font-mono font-black px-2 py-0.5 rounded ${t.status === 'in_progress' ? 'bg-cyan-100 text-cyan-700' : 'bg-slate-100 text-slate-600'}">${t.status === 'in_progress' ? '進行中' : '未着手'}</span>
-                        </div>
-                        <div class="font-bold text-slate-700 text-sm mb-1">${t.title}</div>
-                        <div class="text-xs text-slate-400 truncate"><i class="fa-solid fa-note-sticky mr-1"></i>${t.notes || 'メモなし'}</div>
-                    </div>`;
-                }).join('');
-            }
-
-            if (activeDashboardTaskId) {
-                const actTask = state.tasks.find(t => t.id === activeDashboardTaskId);
-                if (actTask) {
-                    document.getElementById('dashboard-memo-title').innerText = actTask.title;
-                    const input = document.getElementById('dashboard-memo-input');
-                    input.value = actTask.notes || '';
-                    input.disabled = false;
-                    document.getElementById('dashboard-memo-save').disabled = false;
-                }
-            } else {
-                document.getElementById('dashboard-memo-title').innerText = 'タスクを選択してください';
-                const input = document.getElementById('dashboard-memo-input');
-                input.value = '';
-                input.disabled = true;
-                document.getElementById('dashboard-memo-save').disabled = true;
-            }
-        }
-
-        function selectDashboardTask(id) {
-            activeDashboardTaskId = id;
-            renderDashboard();
-        }
-
-        async function saveDashboardMemo() {
-            if (!activeDashboardTaskId) return;
-            const input = document.getElementById('dashboard-memo-input').value;
-            const task = state.tasks.find(t => t.id === activeDashboardTaskId);
-            if (task) {
-                task.notes = input;
-                await saveDoc('tasks', task.id, task);
-                const btn = document.getElementById('dashboard-memo-save');
-                const orig = btn.innerHTML;
-                btn.innerHTML = '<i class="fa-solid fa-check mr-2"></i>保存しました';
-                btn.classList.add('bg-emerald-500', 'hover:bg-emerald-600');
-                btn.classList.remove('bg-amber-500', 'hover:bg-amber-600');
-                setTimeout(() => {
-                    btn.innerHTML = orig;
-                    btn.classList.remove('bg-emerald-500', 'hover:bg-emerald-600');
-                    btn.classList.add('bg-amber-500', 'hover:bg-amber-600');
-                }, 2000);
-            }
-        }
-
-        function switchView
-(view) {
-            if (view === 'weekly' && state.currentView !== 'weekly') {
-                showDialog(
-                    '確認', 
-                    '日曜日までの進捗率の記入はお済みですか？\n※現在の進捗率をもとに、翌週の割り当て可能な残工数を算出します。', 
-                    'info', 
-                    () => { executeSwitchView(view); }, 
-                    () => {}
-                );
-            } else {
-                executeSwitchView(view);
-            }
-        }
-
-        function executeSwitchView(view) {
-            state.currentView = view;
-            
-            ['kanban', 'gantt', 'weekly', 'dashboard'].forEach(v => {
-                const tab = document.getElementById(`tab-${v}`);
-                if (tab) {
-                    if (v === view) {
-                        tab.className = "px-6 py-2.5 rounded-lg text-sm font-bold uppercase tracking-widest transition-all bg-cyan-600 text-white shadow-md border-2 border-cyan-500";
-                    } else {
-                        tab.className = "px-6 py-2.5 rounded-lg text-sm font-bold uppercase tracking-widest transition-all text-slate-400 hover:text-cyan-600 hover:bg-white";
-                    }
-                }
-                const vDiv = document.getElementById(`view-${v}`);
-                if (vDiv) {
-                    if (v === view) vDiv.classList.remove('hidden');
-                    else vDiv.classList.add('hidden');
-                }
-            });
             refreshCurrentView();
         }
 
@@ -2010,9 +1925,18 @@
         async function unassignBlock(taskId, subtaskId, dateStr, startSlot) {
             const task = state.tasks.find(t => t.id === taskId);
             if(task) {
-                // If it's an ad-hoc task, delete it entirely when unassigned
                 if (task.projectId === 'adhoc-project') {
-                    await deleteDocById('tasks', taskId);
+                    if (task.subtasks.length <= 1) {
+                        await deleteDocById('tasks', taskId);
+                    } else {
+                        const subtask = task.subtasks.find(s => s.id === subtaskId);
+                        if (subtask) {
+                            const idx = subtask.assignments.findIndex(a => a.date === dateStr && a.startSlot === startSlot);
+                            if(idx >= 0) subtask.assignments.splice(idx, 1);
+                            subtask.completed = true;
+                            await saveDoc('tasks', task.id, task);
+                        }
+                    }
                     return;
                 }
                 const subtask = task.subtasks.find(s => s.id === subtaskId);
