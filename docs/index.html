@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
@@ -1592,11 +1592,16 @@
             }
         }
 
+        function renderWeekly() {
+            renderAdHocTemplates();
+            const baseDate = new Date(state.weeklyBaseDate);
+            const endDate = new Date(baseDate);
+            endDate.setDate(endDate.getDate() + 6);
             const rangeEl = document.getElementById('weekly-current-date-range');
             if (rangeEl) {
                 const startStr = `${baseDate.getFullYear()}/${baseDate.getMonth() + 1}/${baseDate.getDate()}`;
                 const endStr = `${endDate.getFullYear()}/${endDate.getMonth() + 1}/${endDate.getDate()}`;
-                rangeEl.innerText = `${startStr} 縲・${endStr}`;
+                rangeEl.innerText = `${startStr} 〜 ${endStr}`;
             }
 
             const pId = document.getElementById('weekly-project-filter').value;
@@ -1663,7 +1668,7 @@
             const renderTaskGroup = (task, isOpen) => {
                 const project = state.projects.find(p => p.id === task.projectId);
                 const pColor = project ? project.color : '#9ca3af';
-                const pName = project ? project.name : '謇螻槭↑縺・;
+                const pName = project ? project.name : '所属なし';
 
                 const overdue = isOverdue(task);
                 const titleClass = overdue ? 'text-fuchsia-700' : 'text-slate-800';
@@ -1723,9 +1728,9 @@
                                     <span class="text-xs font-black ${titleClass} truncate font-mono uppercase tracking-tight ml-1">${task.title}</span>
                                 </div>
                                 <div class="flex justify-between items-center pl-6">
-                                    <div class="text-[10px] font-bold ${dateClass} uppercase tracking-tighter">邏肴悄: ${task.dueDate ? task.dueDate.substring(5).replace('-','/') : '譛ｪ險ｭ螳・}</div>
+                                    <div class="text-[10px] font-bold ${dateClass} uppercase tracking-tighter">納期: ${task.dueDate ? task.dueDate.substring(5).replace('-','/') : '未設定'}</div>
                                     <span class="text-[10px] font-bold ${progColor} uppercase tracking-tighter bg-white px-2 py-0.5 rounded border border-slate-100">
-                                        逶ｮ讓・${targetProg}% / 莠亥ｮ・${plannedProg}%
+                                        目標:${targetProg}% / 予定:${plannedProg}%
                                     </span>
                                 </div>
                             </div>
@@ -1749,7 +1754,7 @@
                 divider.className = "mt-8 mb-4 flex items-center gap-3";
                 divider.innerHTML = `
                     <div class="h-0.5 bg-slate-200 flex-1"></div>
-                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">蠕・ｩ滉ｸｭ縺ｮ繧ｿ繧ｹ繧ｯ</span>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">待機中のタスク</span>
                     <div class="h-0.5 bg-slate-200 flex-1"></div>
                 `;
                 poolContainer.appendChild(divider);
@@ -1857,12 +1862,6 @@
                 calContainer.appendChild(colDiv);
             }
         }
-
-        function dragStartWeeklyPool(ev, taskId, subtaskId, remainingHours) {
-            const duration = remainingHours >= 1 ? 2 : 1; 
-            ev.dataTransfer.setData("text/plain", JSON.stringify({ type: 'from_pool', taskId, subtaskId, duration }));
-        }
-
 
         function dragStartWeeklyPool(ev, taskId, subtaskId, remainingHours) {
             const duration = remainingHours >= 1 ? 2 : 1; 
