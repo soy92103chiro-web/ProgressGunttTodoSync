@@ -1698,17 +1698,28 @@
                     if (st.completed) return;
                     const completedH = st.hours * ((st.progress||0) / 100);
                     const remH = parseFloat(Math.max(0, st.hours - completedH).toFixed(1));
+                    const assignedH = st.assignments.reduce((sum, a) => sum + a.duration * 0.5, 0);
 
                     totalRemH += remH;
 
+                    let assignBadge = '';
+                    const isFull = assignedH > 0 && assignedH >= remH;
+                    if (assignedH > 0) {
+                        const pct = remH > 0 ? Math.round(Math.min(100, (assignedH / remH) * 100)) : 100;
+                        const colorClass = isFull ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-cyan-50 text-cyan-700 border-cyan-200';
+                        assignBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-black border ${colorClass} shrink-0">割当 ${pct}%</span>`;
+                    }
+                    const blockOpacity = isFull ? 'opacity-60 hover:opacity-100' : 'opacity-100';
+
                     stHtml += `
-                        <div class="p-3 pl-4 bg-white border-2 border-slate-100 hover:border-cyan-500/30 rounded-xl shadow-sm flex flex-col gap-1 group cursor-grab active:cursor-grabbing transition-all"
+                        <div class="p-3 pl-4 bg-white border-2 border-slate-100 hover:border-cyan-500/30 rounded-xl shadow-sm flex flex-col gap-1 group cursor-grab active:cursor-grabbing transition-all ${blockOpacity}"
                              draggable="true" ondragstart="dragStartWeeklyPool(event, '${task.id}', '${st.id}', ${remH})"
                              ondblclick="openTaskModal('${task.id}')">
                              <div class="flex items-center justify-between">
-                                 <div class="flex items-center gap-3 flex-1 overflow-hidden text-xs font-mono">
+                                 <div class="flex items-center gap-2 flex-1 overflow-hidden text-xs font-mono">
                                      <i class="fa-solid fa-grip-vertical text-slate-200 group-hover:text-cyan-500 transition-colors"></i>
                                      <span class="truncate text-slate-700 font-black uppercase tracking-tight">${st.title}</span>
+                                     ${assignBadge}
                                  </div>
                                  <span class="bg-slate-800 text-white font-bold border-2 border-slate-800 px-2 py-0.5 rounded-lg text-[10px] ml-3 shrink-0 shadow-sm">${remH}h</span>
                              </div>
