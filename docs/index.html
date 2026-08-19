@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
@@ -1592,16 +1592,11 @@
             }
         }
 
-        function renderWeekly() {
-            renderAdHocTemplates();
-            const baseDate = new Date(state.weeklyBaseDate);
-            const endDate = new Date(baseDate);
-            endDate.setDate(endDate.getDate() + 6);
             const rangeEl = document.getElementById('weekly-current-date-range');
             if (rangeEl) {
                 const startStr = `${baseDate.getFullYear()}/${baseDate.getMonth() + 1}/${baseDate.getDate()}`;
                 const endStr = `${endDate.getFullYear()}/${endDate.getMonth() + 1}/${endDate.getDate()}`;
-                rangeEl.innerText = `${startStr} 〜 ${endStr}`;
+                rangeEl.innerText = `${startStr} 縲・${endStr}`;
             }
 
             const pId = document.getElementById('weekly-project-filter').value;
@@ -1626,11 +1621,9 @@
             }).forEach(t => {
                 let hasUnassigned = false;
                 t.subtasks.forEach(st => {
-                    if (st.completed) return;
-                    const completedH = st.hours * (st.progress / 100);
-                    const assignedH = st.assignments.reduce((sum, a) => sum + a.duration * 0.5, 0);
-                    const remH = parseFloat(Math.max(0, st.hours - completedH - assignedH).toFixed(1));
-                    if (remH > 0) hasUnassigned = true;
+                    if (!st.completed) {
+                        hasUnassigned = true;
+                    }
                 });
 
                 if (!hasUnassigned) return;
@@ -1648,14 +1641,21 @@
                 else irrelevantTasks.push(t);
             });
 
-            const sortByDueDate = (a, b) => {
+            const sortByDueDateAndProject = (a, b) => {
                 const da = a.dueDate ? new Date(a.dueDate).getTime() : 9999999999999;
                 const db = b.dueDate ? b.dueDate : 9999999999999;
-                return da - db;
+                if (da !== db) {
+                    return da - db;
+                }
+                const pA = state.projects.find(p => p.id === a.projectId);
+                const pB = state.projects.find(p => p.id === b.projectId);
+                const nameA = pA ? pA.name : 'zzzz';
+                const nameB = pB ? pB.name : 'zzzz';
+                return nameA.localeCompare(nameB, 'ja');
             };
 
-            relevantTasks.sort(sortByDueDate);
-            irrelevantTasks.sort(sortByDueDate);
+            relevantTasks.sort(sortByDueDateAndProject);
+            irrelevantTasks.sort(sortByDueDateAndProject);
 
             const poolContainer = document.getElementById('weekly-unassigned-pool');
             poolContainer.innerHTML = '';
@@ -1663,7 +1663,7 @@
             const renderTaskGroup = (task, isOpen) => {
                 const project = state.projects.find(p => p.id === task.projectId);
                 const pColor = project ? project.color : '#9ca3af';
-                const pName = project ? project.name : '所属なし';
+                const pName = project ? project.name : '謇螻槭↑縺・;
 
                 const overdue = isOverdue(task);
                 const titleClass = overdue ? 'text-fuchsia-700' : 'text-slate-800';
@@ -1692,9 +1692,7 @@
                 task.subtasks.forEach(st => {
                     if (st.completed) return;
                     const completedH = st.hours * ((st.progress||0) / 100);
-                    const assignedH = st.assignments.reduce((sum, a) => sum + a.duration * 0.5, 0);
-                    const remH = parseFloat(Math.max(0, st.hours - completedH - assignedH).toFixed(1));
-                    if (remH <= 0) return;
+                    const remH = parseFloat(Math.max(0, st.hours - completedH).toFixed(1));
 
                     totalRemH += remH;
 
@@ -1719,14 +1717,15 @@
                     accDiv.innerHTML = `
                         <div class="px-4 py-3 bg-slate-50 border-b-2 border-transparent flex items-center justify-between cursor-pointer hover:bg-white transition-all" onclick="toggleAccordion('acc-${task.id}', 'icon-${task.id}')">
                             <div class="flex flex-col flex-1 pr-4">
-                                <div class="flex items-center gap-3 overflow-hidden mb-1.5">
+                                <div class="flex items-center gap-2 overflow-hidden mb-1.5">
                                     <span class="w-3 h-3 rounded-full flex-shrink-0 shadow-sm" style="background-color: ${pColor}"></span>
-                                    <span class="text-xs font-black ${titleClass} truncate font-mono uppercase tracking-tight">${task.title}</span>
+                                    <span class="text-[10px] font-bold text-slate-500 truncate shrink-0 px-1.5 py-0.5 rounded bg-slate-200/50">${pName}</span>
+                                    <span class="text-xs font-black ${titleClass} truncate font-mono uppercase tracking-tight ml-1">${task.title}</span>
                                 </div>
                                 <div class="flex justify-between items-center pl-6">
-                                    <div class="text-[10px] font-bold ${dateClass} uppercase tracking-tighter">納期: ${task.dueDate ? task.dueDate.substring(5).replace('-','/') : '未設定'}</div>
+                                    <div class="text-[10px] font-bold ${dateClass} uppercase tracking-tighter">邏肴悄: ${task.dueDate ? task.dueDate.substring(5).replace('-','/') : '譛ｪ險ｭ螳・}</div>
                                     <span class="text-[10px] font-bold ${progColor} uppercase tracking-tighter bg-white px-2 py-0.5 rounded border border-slate-100">
-                                        目標:${targetProg}% / 予定:${plannedProg}%
+                                        逶ｮ讓・${targetProg}% / 莠亥ｮ・${plannedProg}%
                                     </span>
                                 </div>
                             </div>
@@ -1750,7 +1749,7 @@
                 divider.className = "mt-8 mb-4 flex items-center gap-3";
                 divider.innerHTML = `
                     <div class="h-0.5 bg-slate-200 flex-1"></div>
-                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">待機中のタスク</span>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">蠕・ｩ滉ｸｭ縺ｮ繧ｿ繧ｹ繧ｯ</span>
                     <div class="h-0.5 bg-slate-200 flex-1"></div>
                 `;
                 poolContainer.appendChild(divider);
@@ -1773,7 +1772,6 @@
                 let blocksHtml = '';
 
                 state.tasks.forEach(t => {
-                    if (pId !== 'all' && t.projectId !== pId) return;
                     if (!state.showCompletedProjects && isProjectCompleted(t.projectId)) return;
 
                     const proj = state.projects.find(p => p.id === t.projectId);
@@ -1849,7 +1847,7 @@
                          ondragleave="dragWeeklyLeaveContainer(event)" 
                          ondrop="dropWeeklyContainer(event, '${dateStr}')">
                         
-                        <div class="absolute inset-0 z-0 flex flex-col pointer-events-none">
+                        <div class="absolute inset-0 z-0 pointer-events-none">
                             ${slotsHtml}
                         </div>
                         ${blocksHtml}
@@ -1859,6 +1857,12 @@
                 calContainer.appendChild(colDiv);
             }
         }
+
+        function dragStartWeeklyPool(ev, taskId, subtaskId, remainingHours) {
+            const duration = remainingHours >= 1 ? 2 : 1; 
+            ev.dataTransfer.setData("text/plain", JSON.stringify({ type: 'from_pool', taskId, subtaskId, duration }));
+        }
+
 
         function dragStartWeeklyPool(ev, taskId, subtaskId, remainingHours) {
             const duration = remainingHours >= 1 ? 2 : 1; 
@@ -3426,7 +3430,9 @@
             openProjectTemplateModal, addTemplateMilestone, removeTemplateMilestone,
             moveTemplateMilestone, handleTemplateMilestoneChange, handleTemplateTaskChange, saveProjectTemplate,
             // Calendar & Holidays
-            openCalendarModal, addCompanyHoliday, removeCompanyHoliday, handlePrint
+            openCalendarModal, addCompanyHoliday, removeCompanyHoliday, handlePrint,
+            // Regular Meetings
+            openRegularMeetingModal, saveRegularMeetings
         });
 
     </script>
