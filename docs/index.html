@@ -1387,7 +1387,10 @@
             const repeatWeeks = parseInt(document.getElementById('rm-weeks').value) || 4;
 
             const [hh, mm] = startTime.split(':').map(Number);
-            const startSlot = hh * 2 + (mm >= 30 ? 1 : 0);
+            let rawSlot = (hh - 9) * 2 + (mm >= 30 ? 1 : 0);
+            if (rawSlot < 0) rawSlot = 0;
+            if (rawSlot > 17) rawSlot = 17;
+            const startSlot = rawSlot;
             const durationSlots = Math.round(durationH * 2);
 
             let adhocP = state.projects.find(p => p.id === 'adhoc-project');
