@@ -287,7 +287,7 @@
                         <i class="fa-solid fa-file-pdf"></i> ガントチャート出力
                     </button>
                 </div>
-                <div class="flex items-center gap-4 text-xs font-bold text-slate-500 bg-white p-3 rounded-lg border-2 border-slate-100 shadow-inner" id="gantt-legend"></div>
+                <div class="flex items-center gap-4 text-xs font-bold text-slate-500 bg-white p-3 rounded-lg border-2 border-slate-100 shadow-inner" id="gantt-legend" style="display:none;"></div>
             </div>
             <div class="flex-1 overflow-auto relative" id="gantt-container-wrapper">
                 <div id="gantt-container" class="bg-white"></div>
@@ -3228,13 +3228,45 @@
                     </div>`;
                 }
 
+                                const projStickyClass = isPrint ? "" : `sticky top-[${headerHeight}px] z-30`;
+                
+                let projectLegendHtml = '';
+                const startT = startDate ? startDate.getTime() : 0;
+                const endT = endDate ? endDate.getTime() : Infinity;
+                if(proj.milestones && proj.milestones.length > 0) {
+                    const legendMap = new Map();
+                    proj.milestones.forEach(ms => {
+                        let visible = false;
+                        if (startDate && endDate) {
+                            if (ms.type === 'point' && ms.date) {
+                                const t = new Date(ms.date).setHours(0,0,0,0);
+                                visible = (t >= startT && t <= endT);
+                            } else if (ms.type === 'range' && ms.startDate && ms.endDate) {
+                                const ts = new Date(ms.startDate).setHours(0,0,0,0);
+                                const te = new Date(ms.endDate).setHours(0,0,0,0);
+                                visible = (te >= startT && ts <= endT);
+                            }
+                        }
+                        if(visible && !legendMap.has(ms.name)) {
+                            legendMap.set(ms.name, `<div class="flex items-center gap-1.5"><i class="fa-solid ${ms.icon||'fa-flag'}" style="color:${ms.color||'#4b5563'}"></i><span>${ms.name}</span></div>`);
+                        }
+                    });
+                    if (legendMap.size > 0) {
+                        projectLegendHtml = `<div class="mt-2 text-[10px] flex flex-wrap gap-x-3 gap-y-1 text-slate-500 font-bold tracking-widest not-italic">` + Array.from(legendMap.values()).join('') + `</div>`;
+                    }
+                }
+
                 html += `
-                <div class="flex border-y-2 border-slate-200 bg-slate-100/50 backdrop-blur-sm shadow-sm ${projOpacity}">
-                    <div style="width: ${currentHeaderWidth}px; min-width: ${currentHeaderWidth}px;" class="p-4 border-r-2 border-slate-200 ${stickyClass} flex items-center bg-slate-50/80 font-black text-slate-800 text-base font-mono uppercase tracking-tight italic">
-                        <div class="w-4 h-4 rounded-sm mr-3 shadow-md" style="background-color: ${proj.color}"></div>
-                        <span class="truncate">${proj.name}${isComp ? ' [完了]' : ''}</span>
+                <div class="project-group relative">
+                <div class="flex border-y-2 border-slate-200 bg-slate-100/50 backdrop-blur-sm shadow-sm ${projOpacity} ${projStickyClass}">
+                    <div style="width: ${currentHeaderWidth}px; min-width: ${currentHeaderWidth}px;" class="p-4 border-r-2 border-slate-200 ${stickyClass} flex flex-col justify-center bg-slate-50/90 font-black text-slate-800 text-base font-mono uppercase tracking-tight italic">
+                        <div class="flex items-center">
+                            <div class="w-4 h-4 rounded-sm mr-3 shadow-md flex-shrink-0" style="background-color: ${proj.color}"></div>
+                            <span class="truncate">${proj.name}${isComp ? ' [完了]' : ''}</span>
+                        </div>
+                        ${projectLegendHtml}
                     </div>
-                    <div class="relative flex-1 py-4" style="width: ${totalDays * currentCellWidth}px; height: 56px;">
+                    <div class="relative flex-1 py-4" style="width: ${totalDays * currentCellWidth}px; min-height: 56px;">
                 `;
                 
                 if(proj.milestones && proj.milestones.length > 0) {
@@ -3332,9 +3364,9 @@
                                 </div>
                                 <div class="flex-1"></div>
                             </div>`;
-                        });
-                    }
+                        });                    }
                 });
+                html += `</div>`; // End project-group
             });
             html += `</div></div>`;
             return html;
