@@ -718,6 +718,10 @@
             let filtered = state.projects.filter(p => p.name.toLowerCase().includes(term));
             const selectedSet = projectSelectMode === 'gantt' ? state.ganttSelectedProjects : state.kanbanSelectedProjects;
 
+            if (projectSelectMode === 'gantt') {
+                filtered = filtered.filter(p => !p.name.includes('臨時') && !p.name.includes('事務'));
+            }
+
             if (!state.showCompletedProjects) {
                 filtered = filtered.filter(p => !isProjectCompleted(p.id));
             }
@@ -3410,6 +3414,9 @@
             if (!state.showCompletedProjects) {
                 filteredProjects = filteredProjects.filter(p => !isProjectCompleted(p.id));
             }
+
+            // Exclude 臨時 and 事務 from Gantt completely
+            filteredProjects = filteredProjects.filter(p => !p.name.includes('臨時') && !p.name.includes('事務'));
 
             // 2. Further filter by user selection if any
             if (state.ganttSelectedProjects.size > 0) {
