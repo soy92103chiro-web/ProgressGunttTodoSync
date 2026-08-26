@@ -1482,6 +1482,13 @@
             const currentFilter = document.getElementById('dashboard-project-filter')?.value || 'all';
 
             let allLogs = [];
+            
+            // ALERT 2
+            if (state.currentView === 'dashboard') {
+                let taskDbg = state.tasks.slice(0, 3).map(t => `ID:${t.id}, logs:${t.memoLogs?t.memoLogs.length:0}`).join(', ');
+                alert("DEBUG 2\nTasks Length: " + state.tasks.length + "\nFilter: " + (document.getElementById('dashboard-project-filter')?.value) + "\n" + taskDbg);
+            }
+            
             state.tasks.forEach(t => {
                 if (currentFilter !== 'all' && t.projectId !== currentFilter) return;
                 const proj = state.projects.find(p => p.id === t.projectId) || { name: '不明', color: '#999' };
@@ -1504,8 +1511,9 @@
             allLogs.sort((a, b) => b.dateObj - a.dateObj);
 
             if (allLogs.length === 0) {
-                let dbg = state.tasks.map(t => `ID:${t.id}, Notes:'${t.notes}', MemoLen:${t.memoLogs ? t.memoLogs.length : 0}`).join('<br>');
-                container.innerHTML = '<div class="text-center text-slate-400 mt-20"><i class="fa-solid fa-wind text-4xl mb-4"></i><p>表示するメモ履歴がありません</p><div class="mt-4 text-xs text-left bg-slate-100 p-4 rounded overflow-y-auto max-h-40">' + dbg + '</div></div>';
+                let dbg = state.tasks.map(t => `ID:${t.id}, Notes:${t.notes ? 'YES' : 'NO'}, MemoLen:${t.memoLogs ? t.memoLogs.length : 0}`).join('\n');
+                alert("DEBUG INFO\nallLogs is empty!\nTasks: " + state.tasks.length + "\n" + dbg.substring(0, 500));
+                container.innerHTML = '<div class="text-center text-slate-400 mt-20"><i class="fa-solid fa-wind text-4xl mb-4"></i><p>表示するメモ履歴がありません</p></div>';
                 return;
             }
 
