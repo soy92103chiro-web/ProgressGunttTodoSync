@@ -1280,9 +1280,18 @@
         async function unassignBlock(taskId, subtaskId, dateStr, startSlot) {
             const task = state.tasks.find(t => t.id === taskId);
             if(task) {
-                // If it's an ad-hoc task, delete it entirely when unassigned
                 if (task.projectId === 'adhoc-project') {
-                    await deleteDocById('tasks', taskId);
+                    if (task.subtasks.length <= 1) {
+                        await deleteDocById('tasks', taskId);
+                    } else {
+                        const subtask = task.subtasks.find(s => s.id === subtaskId);
+                        if (subtask) {
+                            const idx = subtask.assignments.findIndex(a => a.date === dateStr && a.startSlot === startSlot);
+                            if(idx >= 0) subtask.assignments.splice(idx, 1);
+                            subtask.completed = true;
+                            await saveDoc('tasks', task.id, task);
+                        }
+                    }
                     return;
                 }
                 const subtask = task.subtasks.find(s => s.id === subtaskId);
