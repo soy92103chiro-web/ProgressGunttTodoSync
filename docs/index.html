@@ -2775,8 +2775,22 @@
                             <button onclick="removeSubtask('${st.id}')" class="text-slate-300 hover:text-red-500 px-2 transition-all"><i class="fa-solid fa-trash-can text-lg"></i></button>
                         </div>
                     </div>
-                    <div id="st-note-${st.id}" class="mt-4 pl-9 ${st.notes ? '' : 'hidden'}">
-                        <textarea onchange="handleSubtaskChange('${st.id}', 'notes', this.value)" rows="2" class="w-full bg-slate-100 border-2 border-slate-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-600 focus:border-cyan-500 outline-none transition-all" placeholder="詳細な進捗状況やメモを入力してください...">${st.notes || ''}</textarea>
+                    <div id="st-note-${st.id}" class="mt-4 pl-9 ${(st.memoLogs && st.memoLogs.length > 0) || st.showMemoInput ? '' : 'hidden'}">
+                        <div class="space-y-3 mb-3 max-h-40 overflow-y-auto custom-scrollbar pr-2">
+                            ${(st.memoLogs || []).map(log => `
+                                <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm relative group">
+                                    <div class="flex justify-between items-center mb-1">
+                                        <div class="text-[10px] text-slate-400 font-bold">${dateUtils.formatDateTime(new Date(log.timestamp))}</div>
+                                        <button onclick="deleteSubtaskMemoLog('${st.id}', '${log.id}')" class="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><i class="fa-solid fa-trash-can text-[10px]"></i></button>
+                                    </div>
+                                    <div class="text-xs text-slate-700 whitespace-pre-wrap">${log.content}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                        <div class="flex items-start gap-2">
+                            <textarea id="st-note-input-${st.id}" rows="2" class="w-full bg-slate-100 border-2 border-slate-200 rounded-xl px-4 py-3 text-xs font-medium text-slate-600 focus:border-cyan-500 outline-none transition-all" placeholder="新しいメモを入力..."></textarea>
+                            <button onclick="addSubtaskMemoLog('${st.id}')" class="bg-cyan-600 text-white px-4 py-3 rounded-xl hover:bg-cyan-700 transition-all shadow-sm text-xs font-bold whitespace-nowrap"><i class="fa-solid fa-paper-plane"></i></button>
+                        </div>
                     </div>
                 </div>
             `).join('');
