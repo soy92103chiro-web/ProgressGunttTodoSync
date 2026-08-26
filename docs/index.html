@@ -1399,10 +1399,10 @@
                 await saveDoc('projects', 'adhoc-project', adhocP);
             }
 
-            const today = new Date();
-            today.setHours(0,0,0,0);
+            const baseDate = new Date(state.weeklyBaseDate || new Date());
+            baseDate.setHours(0,0,0,0);
             
-            let targetDate = new Date(today);
+            let targetDate = new Date(baseDate);
             while (targetDate.getDay() !== dayOfWeek) {
                 targetDate.setDate(targetDate.getDate() + 1);
             }
