@@ -1316,6 +1316,11 @@
                 const diff = d.getDate() - day + (day === 0 ? -6 : 1);
                 return new Date(d.setDate(diff));
             },
+            formatDateTime: (d) => {
+                const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
+                const h = String(d.getHours()).padStart(2,'0'), min = String(d.getMinutes()).padStart(2,'0');
+                return `${y}/${m}/${day} ${h}:${min}`;
+            },
             formatDate: (date) => {
                 return date.getFullYear() + '-' + String(date.getMonth()+1).padStart(2,'0') + '-' + String(date.getDate()).padStart(2,'0');
             },
@@ -2883,8 +2888,20 @@
                                         <p class="text-[10px] text-slate-400 mt-3 leading-relaxed font-bold italic">※納期から工数を逆算し、他の案件負荷や休日を考慮して算出されます。</p>
                                     </div>
                                     <div class="pt-4 border-t-2 border-slate-50">
-                                        <label class="block text-xs font-black text-slate-500 mb-3">補足事項・メモ</label>
-                                        <textarea onchange="updateWorkingTask('notes', this.value)" rows="10" class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 text-sm font-medium text-slate-600 focus:border-cyan-500 outline-none transition-all resize-none" placeholder="タスクに関する詳細な指示や連絡事項を入力...">${workingTask.notes || ''}</textarea>
+                                        <label class="block text-xs font-black text-slate-500 mb-3">補足事項・メモ履歴</label>
+                                        <div class="space-y-3 mb-4 max-h-60 overflow-y-auto custom-scrollbar pr-2">
+                                            ${(workingTask.memoLogs || []).map(log => `
+                                                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative group">
+                                                    <div class="text-[10px] text-slate-400 font-bold mb-2">${dateUtils.formatDateTime(new Date(log.timestamp))}</div>
+                                                    <div class="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">${log.content}</div>
+                                                    <button onclick="deleteTaskMemoLog('${log.id}')" class="absolute top-2 right-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><i class="fa-solid fa-trash-can text-sm"></i></button>
+                                                </div>
+                                            `).join('')}
+                                        </div>
+                                        <div class="flex items-start gap-3">
+                                            <textarea id="task-note-input" rows="3" class="w-full bg-slate-50 border-2 border-slate-200 rounded-2xl px-5 py-4 text-sm font-medium text-slate-600 focus:border-cyan-500 outline-none transition-all resize-none" placeholder="新しいメモを入力..."></textarea>
+                                            <button onclick="addTaskMemoLog()" class="bg-cyan-600 text-white px-6 py-4 rounded-2xl hover:bg-cyan-700 transition-all shadow-md text-sm font-bold whitespace-nowrap h-[88px] flex flex-col items-center justify-center"><i class="fa-solid fa-paper-plane mb-1"></i>追加</button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -3188,7 +3205,7 @@
                             <div class="pl-3 flex-1 flex flex-col">
                                 ${alertBadge}
                                 <h4 class="font-black ${titleColor} text-sm mb-2 pr-6 leading-snug tracking-tight uppercase">${task.title}</h4>
-                                <div class="text-[11px] text-slate-400 line-clamp-2 mb-4 font-mono font-bold leading-relaxed">${task.notes || ''}</div>
+                                <div class="text-[11px] text-slate-400 line-clamp-2 mb-4 font-mono font-bold leading-relaxed">${(task.memoLogs && task.memoLogs.length > 0) ? task.memoLogs[0].content : ''}</div>
                                 <div class="flex items-center justify-between mt-auto pt-3 border-t border-slate-50">
                                     <div class="flex items-center gap-2 text-[11px] font-mono font-black text-cyan-600" title="Progress">
                                         <i class="fa-solid fa-microchip"></i>
