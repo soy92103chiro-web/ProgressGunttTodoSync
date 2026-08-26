@@ -189,19 +189,6 @@
                     </h1>
                     <span class="text-[11px] font-mono font-bold text-cyan-600/60 uppercase tracking-[0.2em]">業務運用マトリクス v11.6</span>
                 </div>
-            </div>
-            
-            <div class="flex items-center gap-6">
-                <div class="bg-slate-100 p-1.5 rounded-xl flex gap-1 border-2 border-slate-200">
-                    <button onclick="switchView('kanban')" id="tab-kanban" class="px-6 py-2.5 rounded-lg text-sm font-mono font-black uppercase tracking-widest transition-all bg-white text-cyan-600 shadow-md border-2 border-cyan-500/20">カンバン</button>
-                    <button onclick="switchView('gantt')" id="tab-gantt" class="px-6 py-2.5 rounded-lg text-sm font-mono font-black uppercase tracking-widest transition-all text-slate-400 hover:text-cyan-600 hover:bg-white">ガントチャート</button>
-                    <button onclick="switchView('weekly')" id="tab-weekly" class="px-6 py-2.5 rounded-lg text-sm font-mono font-black uppercase tracking-widest transition-all text-slate-400 hover:text-cyan-600 hover:bg-white">週間スケジュール</button>
-<button onclick="switchView(\'dashboard\')" id="tab-dashboard" class="px-6 py-2.5 rounded-lg text-sm font-mono font-black uppercase tracking-widest transition-all text-slate-400 hover:text-cyan-600 hover:bg-white">TODO(ダッシュボード)</button>
-                </div>
-                <div class="h-8 w-0.5 bg-slate-200"></div>
-                <div class="flex items-center gap-2">
-                    <button onclick="openProjectModal()" class="text-sm font-mono font-black text-slate-500 hover:text-cyan-600 transition-all uppercase px-3 py-2">
-                        <i class="fa-solid fa-folder-plus mr-1.5"></i> 案件追加
                     </button>
                     <button onclick="openCalendarModal()" class="text-sm font-mono font-black text-slate-500 hover:text-cyan-600 transition-all uppercase px-3 py-2">
                         <i class="fa-solid fa-calendar-days mr-1.5"></i> カレンダー設定
@@ -1456,58 +1443,97 @@
         }
 
         function renderDashboard() {
-            const container = document.getElementById('dashboard-todo-list');
+            const container = document.getElementById('dashboard-timeline-container');
             if (!container) return;
 
-            const todayStr = dateUtils.formatDate(new Date());
-            
-            // Find tasks due today or assigned today that are not done
-            const todayTasks = state.tasks.filter(t => {
-                if (t.status === 'done') return false;
-                const isDueToday = t.dueDate === todayStr;
-                const isAssignedToday = t.assignments && t.assignments.some(a => a.date === todayStr);
-                return isDueToday || isAssignedToday;
+            const pFilter = document.getElementById('dashboard-project-filter')?.value;
+            if (pFilter === undefined || pFilter === '') {
+                const sel = document.getElementById('dashboard-project-filter');
+                if (sel) {
+                    sel.innerHTML = '<option value="all">すべての案件</option>' + 
+                        state.projects.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+                }
+            }
+
+            const currentFilter = document.getElementById('dashboard-project-filter')?.value || 'all';
+
+            let allLogs = [];
+            state.tasks.forEach(t => {
+                if (currentFilter !== 'all' && t.projectId !== currentFilter) return;
+                const proj = state.projects.find(p => p.id === t.projectId) || { name: '不明', color: '#999' };
+
+                if (t.memoLogs) {
+                    t.memoLogs.forEach(log => {
+                        allLogs.push({ ...log, projectId: t.projectId, projectName: proj.name, projectColor: proj.color, taskId: t.id, taskTitle: t.title, subtaskTitle: null, dateObj: new Date(log.timestamp) });
+                    });
+                }
+
+                t.subtasks.forEach(st => {
+                    if (st.memoLogs) {
+                        st.memoLogs.forEach(log => {
+                            allLogs.push({ ...log, projectId: t.projectId, projectName: proj.name, projectColor: proj.color, taskId: t.id, taskTitle: t.title, subtaskId: st.id, subtaskTitle: st.title, dateObj: new Date(log.timestamp) });
+                        });
+                    }
+                });
             });
 
-            if (todayTasks.length === 0) {
-                container.innerHTML = '<div class="text-center text-slate-400 mt-10"><i class="fa-solid fa-mug-hot text-4xl mb-4"></i><p>今日のTODOはありません</p></div>';
-            } else {
-                container.innerHTML = todayTasks.map(t => {
-                    const proj = state.projects.find(p => p.id === t.projectId);
-                    return `
-                    <div class="bg-white p-4 rounded-xl shadow-sm border-2 border-slate-200 cursor-pointer hover:border-cyan-400 transition-all ${activeDashboardTaskId === t.id ? 'border-amber-400 shadow-md ring-2 ring-amber-100' : ''}" onclick="selectDashboardTask('${t.id}')">
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="text-[10px] font-bold text-white px-2 py-0.5 rounded shadow-sm" style="background-color: ${proj ? proj.color : '#9ca3af'}">${proj ? proj.name : ''}</span>
-                            <span class="text-xs font-mono font-black px-2 py-0.5 rounded ${t.status === 'in_progress' ? 'bg-cyan-100 text-cyan-700' : 'bg-slate-100 text-slate-600'}">${t.status === 'in_progress' ? '進行中' : '未着手'}</span>
+            allLogs.sort((a, b) => b.dateObj - a.dateObj);
+
+            if (allLogs.length === 0) {
+                container.innerHTML = '<div class="text-center text-slate-400 mt-20"><i class="fa-solid fa-wind text-4xl mb-4"></i><p>表示するメモ履歴がありません</p></div>';
+                return;
+            }
+
+            const logsByProject = {};
+            allLogs.forEach(log => {
+                if (!logsByProject[log.projectId]) logsByProject[log.projectId] = [];
+                logsByProject[log.projectId].push(log);
+            });
+
+            let html = '';
+            const sortedProjectIds = Object.keys(logsByProject).sort((a, b) => logsByProject[b][0].dateObj - logsByProject[a][0].dateObj);
+
+            sortedProjectIds.forEach(pId => {
+                const logs = logsByProject[pId];
+                const pColor = logs[0].projectColor;
+                const pName = logs[0].projectName;
+
+                html += `
+                <div class="bg-white rounded-3xl border-2 border-slate-200 shadow-sm overflow-hidden">
+                    <div class="px-6 py-4 border-b-2 border-slate-100 flex items-center gap-3" style="background-color: ${pColor}10;">
+                        <div class="w-4 h-4 rounded-full shadow-sm" style="background-color: ${pColor}"></div>
+                        <h3 class="font-black text-lg text-slate-800 tracking-widest">${pName}</h3>
+                    </div>
+                    <div class="p-6">
+                        <div class="relative border-l-2 border-slate-200 ml-3 space-y-6">
+                            ${logs.map(log => `
+                                <div class="relative pl-6">
+                                    <div class="absolute -left-[5px] top-1.5 w-2 h-2 rounded-full bg-amber-400 ring-4 ring-white"></div>
+                                    <div class="flex items-center gap-3 mb-2">
+                                        <div class="text-[11px] font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded shadow-sm">${dateUtils.formatDateTime(log.dateObj)}</div>
+                                        <div class="text-xs font-bold text-slate-600 flex items-center gap-2">
+                                            <span class="bg-cyan-50 text-cyan-700 px-2 py-0.5 rounded border border-cyan-100">${log.taskTitle}</span>
+                                            ${log.subtaskTitle ? `<i class="fa-solid fa-angle-right text-slate-300"></i><span class="bg-fuchsia-50 text-fuchsia-700 px-2 py-0.5 rounded border border-fuchsia-100">${log.subtaskTitle}</span>` : ''}
+                                        </div>
+                                    </div>
+                                    <div class="bg-slate-50 border border-slate-100 p-4 rounded-xl text-sm text-slate-700 whitespace-pre-wrap leading-relaxed shadow-sm hover:border-amber-300 hover:bg-amber-50/50 transition-all cursor-pointer group" onclick="openTaskModal('${log.taskId}')">
+                                        <div class="flex justify-between items-start">
+                                            <div>${log.content}</div>
+                                            <i class="fa-solid fa-arrow-up-right-from-square text-amber-500 opacity-0 group-hover:opacity-100 transition-opacity"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            `).join('')}
                         </div>
-                        <div class="font-bold text-slate-700 text-sm mb-1">${t.title}</div>
-                        <div class="text-xs text-slate-400 truncate"><i class="fa-solid fa-note-sticky mr-1"></i>${t.notes || 'メモなし'}</div>
-                    </div>`;
-                }).join('');
-            }
+                    </div>
+                </div>
+                `;
+            });
 
-            if (activeDashboardTaskId) {
-                const actTask = state.tasks.find(t => t.id === activeDashboardTaskId);
-                if (actTask) {
-                    document.getElementById('dashboard-memo-title').innerText = actTask.title;
-                    const input = document.getElementById('dashboard-memo-input');
-                    input.value = actTask.notes || '';
-                    input.disabled = false;
-                    document.getElementById('dashboard-memo-save').disabled = false;
-                }
-            } else {
-                document.getElementById('dashboard-memo-title').innerText = 'タスクを選択してください';
-                const input = document.getElementById('dashboard-memo-input');
-                input.value = '';
-                input.disabled = true;
-                document.getElementById('dashboard-memo-save').disabled = true;
-            }
+            container.innerHTML = html;
         }
 
-        function selectDashboardTask(id) {
-            activeDashboardTaskId = id;
-            renderDashboard();
-        }
+        
 
         async function saveDashboardMemo() {
             if (!activeDashboardTaskId) return;
@@ -2626,10 +2652,22 @@
 
             if (taskId) {
                 workingTask = JSON.parse(JSON.stringify(state.tasks.find(t => t.id === taskId)));
+                if (typeof workingTask.notes === 'string' && workingTask.notes.trim() !== '') {
+                    workingTask.memoLogs = [{ id: generateId(), timestamp: new Date().toISOString(), content: workingTask.notes }];
+                    workingTask.notes = '';
+                }
+                workingTask.memoLogs = workingTask.memoLogs || [];
+                workingTask.subtasks.forEach(st => {
+                    if (typeof st.notes === 'string' && st.notes.trim() !== '') {
+                        st.memoLogs = [{ id: generateId(), timestamp: new Date().toISOString(), content: st.notes }];
+                        st.notes = '';
+                    }
+                    st.memoLogs = st.memoLogs || [];
+                });
             } else {
                 const pId = document.getElementById('kanban-project-filter')?.value;
                 const targetPId = (pId && pId !== 'all') ? pId : state.projects[0].id;
-                workingTask = { id: generateId(), projectId: targetPId, title: '', status: 'todo', dueDate: '', startDate: '', totalHours: 0, notes: '', subtasks: [] };
+                workingTask = { id: generateId(), projectId: targetPId, title: '', status: 'todo', dueDate: '', startDate: '', totalHours: 0, memoLogs: [], subtasks: [] };
             }
             renderTaskModalContent();
             showModal('task-modal');
@@ -2702,8 +2740,8 @@
                                 <input type="number" min="0" step="0.5" value="${st.hours}" onchange="handleSubtaskChange('${st.id}', 'hours', this.value)" class="w-16 text-sm font-bold bg-white border-2 border-slate-200 rounded-lg px-2 py-1 text-right text-slate-700 focus:border-cyan-500 outline-none" placeholder="0.0">
                                 <span class="text-[10px] text-slate-400 font-bold">h</span>
                             </div>
-                            <button onclick="toggleSubtaskNote('st-note-${st.id}', 'st-note-icon-${st.id}')" class="text-slate-400 hover:text-cyan-600 p-2 transition-colors" title="メモを表示">
-                                <i id="st-note-icon-${st.id}" class="fa-solid ${st.notes ? 'fa-comment-dots text-cyan-500' : 'fa-comment-dots'} text-xl"></i>
+                            <button onclick="toggleSubtaskNoteAlt('st-note-${st.id}', 'st-note-icon-${st.id}', '${st.id}')" class="text-slate-400 hover:text-cyan-600 p-2 transition-colors" title="メモを表示">
+                                <i id="st-note-icon-${st.id}" class="fa-solid ${(st.memoLogs && st.memoLogs.length > 0) ? 'fa-comment-dots text-cyan-500' : 'fa-comment-dots'} text-xl"></i>
                             </button>
                             <button onclick="removeSubtask('${st.id}')" class="text-slate-300 hover:text-red-500 px-2 transition-all"><i class="fa-solid fa-trash-can text-lg"></i></button>
                         </div>
@@ -2811,6 +2849,46 @@
                     </div>
                 </div>
             `;
+        }
+
+        
+        function addTaskMemoLog() {
+            const input = document.getElementById('task-note-input');
+            const val = input.value.trim();
+            if (!val) return;
+            workingTask.memoLogs = workingTask.memoLogs || [];
+            workingTask.memoLogs.unshift({ id: generateId(), timestamp: new Date().toISOString(), content: val });
+            renderTaskModalContent();
+        }
+        function deleteTaskMemoLog(logId) {
+            if(!confirm('このメモを削除しますか？')) return;
+            workingTask.memoLogs = workingTask.memoLogs.filter(l => l.id !== logId);
+            renderTaskModalContent();
+        }
+        function addSubtaskMemoLog(stId) {
+            const st = workingTask.subtasks.find(s => s.id === stId);
+            if (!st) return;
+            const input = document.getElementById('st-note-input-' + stId);
+            const val = input.value.trim();
+            if (!val) return;
+            st.memoLogs = st.memoLogs || [];
+            st.memoLogs.unshift({ id: generateId(), timestamp: new Date().toISOString(), content: val });
+            st.showMemoInput = true;
+            renderTaskModalContent();
+        }
+        function deleteSubtaskMemoLog(stId, logId) {
+            if(!confirm('このメモを削除しますか？')) return;
+            const st = workingTask.subtasks.find(s => s.id === stId);
+            if (!st) return;
+            st.memoLogs = st.memoLogs.filter(l => l.id !== logId);
+            renderTaskModalContent();
+        }
+        function toggleSubtaskNoteAlt(noteId, iconId, stId) {
+            const st = workingTask.subtasks.find(s => s.id === stId);
+            if (st) {
+                st.showMemoInput = !st.showMemoInput;
+                renderTaskModalContent();
+            }
         }
 
         function updateWorkingTask(f, v) { workingTask[f] = v; if (f === 'dueDate') { recalculateDates(); renderTaskModalContent(); } }
