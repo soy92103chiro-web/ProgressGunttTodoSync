@@ -1504,12 +1504,7 @@
 
             allLogs.sort((a, b) => b.dateObj - a.dateObj);
 
-            if (allLogs.length === 0) {
-                let dbg = state.tasks.map(t => `ID:${t.id}, Notes:${t.notes ? 'YES' : 'NO'}, MemoLen:${t.memoLogs ? t.memoLogs.length : 0}`).join('\n');
-                alert("DEBUG INFO\nallLogs is empty!\nTasks: " + state.tasks.length + "\n" + dbg.substring(0, 500));
-                container.innerHTML = '<div class="text-center text-slate-400 mt-20"><i class="fa-solid fa-wind text-4xl mb-4"></i><p>表示するメモ履歴がありません</p></div>';
-                return;
-            }
+            
 
             const logsByProject = {};
             allLogs.forEach(log => {
@@ -1558,8 +1553,6 @@
             });
 
             
-            // DEBUG 3
-            alert("DEBUG 3\nallLogs length: " + allLogs.length + "\nHTML length: " + html.length);
             container.innerHTML = html;
 
         }
