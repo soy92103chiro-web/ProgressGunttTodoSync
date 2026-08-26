@@ -61,7 +61,7 @@
             body { background: white !important; color: black !important; overflow: visible !important; height: auto !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             :root { --slot-height: 26px; }
 
-            header, .mb-4, .bg-gray-100.px-5, #weekly-adhoc-pool-container, .drop-overlay, button, .border-b.bg-gray-50, #tab-kanban, #tab-gantt, #tab-weekly, .h-8.w-px, .text-base.font-medium.text-gray-600, .bg-indigo-600.hover\:bg-indigo-700, .text-sm.font-medium.text-gray-500, #weekly-sidebar, .mb-4.flex.items-center.justify-between, .h-6.w-px, .bg-indigo-50.border-indigo-200, .bg-red-50\/50, #gantt-legend, #view-kanban, #gantt-controls { display: none !important; }
+            header, .mb-4, .bg-gray-100.px-5, #weekly-adhoc-pool-container, .drop-overlay, button, .border-b.bg-gray-50, #tab-kanban, #tab-gantt, #tab-weekly, .h-8.w-px, .text-base.font-medium.text-gray-600, .bg-indigo-600.hover\:bg-indigo-700, .text-sm.font-medium.text-gray-500, #weekly-sidebar, #weekly-controls, .mb-4.flex.items-center.justify-between, .h-6.w-px, .bg-indigo-50.border-indigo-200, .bg-red-50\/50, #gantt-legend, #view-kanban, #gantt-controls { display: none !important; }
             
             #view-weekly, #view-gantt { display: none !important; }
             body.print-weekly #view-weekly { position: static !important; display: block !important; padding: 0 !important; margin: 0 !important; overflow: visible !important; height: auto !important; width: 100% !important; background: white !important; }
@@ -310,7 +310,7 @@
                 </div>
             </div>
 
-            <div class="mb-6 flex items-center justify-between flex-shrink-0 bg-white p-6 rounded-xl border-2 border-slate-200 shadow-sm">
+            <div id="weekly-controls" class="mb-6 flex items-center justify-between flex-shrink-0 bg-white p-6 rounded-xl border-2 border-slate-200 shadow-sm">
                 <div class="flex items-center gap-8">
                     <h2 class="text-xl font-black text-cyan-600 italic tracking-tighter"><i class="fa-regular fa-calendar-check mr-3"></i>週間スケジュール</h2>
                     <div class="h-8 w-0.5 bg-slate-200"></div>
