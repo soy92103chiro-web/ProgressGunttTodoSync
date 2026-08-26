@@ -2144,11 +2144,12 @@
             }, () => {});
         }
 
+        
         function renderKanban() {
             const container = document.getElementById('kanban-board');
             container.innerHTML = '';
             const hideDone = document.getElementById('kanban-hide-done')?.checked || false;
-            const pId = document.getElementById('kanban-project-filter')?.value || 'all';
+            const pIdFilter = document.getElementById('kanban-project-filter')?.value || 'all';
 
             let filterTasks = state.tasks;
             
@@ -2156,10 +2157,38 @@
                 filterTasks = filterTasks.filter(t => !isProjectCompleted(t.projectId));
             }
 
-            if (pId !== 'all') {
-                filterTasks = filterTasks.filter(t => t.projectId === pId);
+            if (pIdFilter !== 'all') {
+                filterTasks = filterTasks.filter(t => t.projectId === pIdFilter);
             } else if (state.kanbanSelectedProjects.size > 0) {
                 filterTasks = filterTasks.filter(t => state.kanbanSelectedProjects.has(t.projectId));
+            }
+
+            const relevantProjectIds = new Set();
+            if (pIdFilter !== 'all') relevantProjectIds.add(pIdFilter);
+            else if (state.kanbanSelectedProjects.size > 0) {
+                state.kanbanSelectedProjects.forEach(id => relevantProjectIds.add(id));
+            } else {
+                state.projects.forEach(p => relevantProjectIds.add(p.id));
+            }
+            if (filterTasks.some(t => !t.projectId)) relevantProjectIds.add(null);
+
+            const swimlaneProjects = [];
+            relevantProjectIds.forEach(id => {
+                if (id) {
+                    const p = state.projects.find(proj => proj.id === id);
+                    if (p && (state.showCompletedProjects || !isProjectCompleted(p.id))) swimlaneProjects.push(p);
+                }
+            });
+            
+            swimlaneProjects.sort((a, b) => {
+                const compA = isProjectCompleted(a.id);
+                const compB = isProjectCompleted(b.id);
+                if (compA !== compB) return compA ? 1 : -1;
+                return a.name.localeCompare(b.name);
+            });
+
+            if (relevantProjectIds.has(null)) {
+                swimlaneProjects.push({ id: null, name: '所属なし', color: '#9ca3af' });
             }
 
             const columns = [
@@ -2168,87 +2197,113 @@
                 { id: 'done', title: '完了', icon: 'fa-check-circle', color: 'fuchsia' }
             ];
 
-            columns.forEach(col => {
-                let colTasks = filterTasks.filter(t => t.status === col.id);
-                if (hideDone && col.id === 'done') colTasks = []; 
+            swimlaneProjects.forEach(project => {
+                const pTasks = filterTasks.filter(t => (t.projectId || null) === project.id);
+                if (pTasks.length === 0) return;
 
-                colTasks.sort((a, b) => {
-                    const da = a.dueDate ? a.dueDate : '9999-12-31';
-                    const db = b.dueDate ? b.dueDate : '9999-12-31';
-                    return da.localeCompare(db);
-                });
+                const projectDiv = document.createElement('div');
+                projectDiv.className = `flex flex-col mb-8 bg-white rounded-2xl border-2 border-slate-200 shadow-sm overflow-hidden flex-shrink-0 min-w-max`;
 
-                const colDiv = document.createElement('div');
-                colDiv.className = `flex flex-col bg-slate-200/50 rounded-2xl w-full flex-shrink-0 border-2 border-slate-200/60 shadow-inner`;
-                
-                const titleColorClass = col.id === 'in_progress' ? 'text-cyan-700' : (col.id === 'done' ? 'text-fuchsia-700' : 'text-slate-500');
-                const borderTopClass = col.id === 'in_progress' ? 'border-t-4 border-cyan-500' : (col.id === 'done' ? 'border-t-4 border-fuchsia-500' : '');
+                const isCompProj = project.id ? isProjectCompleted(project.id) : false;
+                const projOp = isCompProj ? 'opacity-70' : '';
 
-                colDiv.innerHTML = `
-                    <div class="p-5 border-b-2 border-slate-200 flex justify-between items-center bg-white/80 rounded-t-2xl ${borderTopClass}">
-                        <div class="flex items-center gap-3"><i class="fa-solid ${col.icon} ${titleColorClass} text-lg"></i><h3 class="font-black ${titleColorClass} text-sm font-mono tracking-widest uppercase">${col.title}</h3></div>
-                        <span class="bg-slate-800 text-white text-xs font-mono font-black px-3 py-1 rounded-full shadow-md">${colTasks.length}</span>
+                const pHeader = document.createElement('div');
+                pHeader.className = `p-4 bg-slate-50 border-b-2 border-slate-200 flex justify-between items-center ${projOp} sticky left-0 z-10 w-screen max-w-full`;
+                pHeader.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="w-3 h-3 rounded-full" style="background-color: ${project.color}"></div>
+                        <h2 class="font-black text-slate-800 text-lg font-mono uppercase tracking-widest">${project.name}</h2>
+                        ${isCompProj ? '<span class="text-[10px] font-bold bg-slate-200 text-slate-500 px-2 py-0.5 rounded-full">完了済</span>' : ''}
                     </div>
-                    <div class="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 min-h-[120px] drop-zone" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="dropTask(event, '${col.id}')"></div>
+                    <span class="text-xs font-bold text-slate-500 bg-white px-3 py-1 rounded-full shadow-sm border border-slate-200">計 ${pTasks.length} タスク</span>
                 `;
-                const taskContainer = colDiv.querySelector('.drop-zone');
-                
-                colTasks.forEach(task => {
-                    const project = state.projects.find(p => p.id === task.projectId);
-                    const pColor = project ? project.color : '#9ca3af';
-                    const compSub = task.subtasks.filter(s => s.completed).length;
+                projectDiv.appendChild(pHeader);
+
+                const lanesContainer = document.createElement('div');
+                lanesContainer.className = `flex gap-6 p-6 min-h-[250px] bg-slate-100/50`;
+
+                columns.forEach(col => {
+                    let colTasks = pTasks.filter(t => t.status === col.id);
+                    if (hideDone && col.id === 'done') colTasks = [];
+
+                    colTasks.sort((a, b) => {
+                        const da = a.dueDate ? a.dueDate : '9999-12-31';
+                        const db = b.dueDate ? b.dueDate : '9999-12-31';
+                        return da.localeCompare(db);
+                    });
+
+                    const colDiv = document.createElement('div');
+                    colDiv.className = `flex flex-col bg-white rounded-2xl w-[450px] flex-shrink-0 border-2 border-slate-200/60 shadow-sm overflow-hidden`;
                     
-                    const isComp = isProjectCompleted(task.projectId);
-                    const overdue = isOverdue(task);
-                    const delayed = isDelayed(task);
-                    const isSelected = state.selectedTasks.has(task.id);
+                    const titleColorClass = col.id === 'in_progress' ? 'text-cyan-700' : (col.id === 'done' ? 'text-fuchsia-700' : 'text-slate-500');
+                    const borderTopClass = col.id === 'in_progress' ? 'border-t-4 border-cyan-500' : (col.id === 'done' ? 'border-t-4 border-fuchsia-500' : 'border-t-4 border-slate-300');
 
-                    const borderClass = overdue ? 'border-fuchsia-500 shadow-[0_0_15px_rgba(217,70,239,0.2)]' : (delayed ? 'border-amber-500' : (isSelected ? 'border-cyan-500 shadow-[0_0_15px_rgba(14,165,233,0.2)]' : 'border-slate-200'));
-                    const opacityClass = isComp ? 'opacity-50 grayscale-[0.5]' : '';
+                    const gridClass = `grid grid-cols-1 xl:grid-cols-2 gap-4`;
 
-                    const card = document.createElement('div');
-                    card.className = `task-card bg-white p-6 rounded-xl border-2 ${borderClass} ${opacityClass} hover:border-cyan-400 transition-all relative overflow-hidden group shadow-sm hover:shadow-md`;
-                    card.draggable = true;
-                    card.ondragstart = (e) => dragStart(e, task.id);
-                    card.ondblclick = () => openTaskModal(task.id);
-                    
-                    let alertBadge = '';
-                    if (isComp) {
-                        alertBadge = `<div class="text-slate-500 text-[10px] font-mono font-black mb-3 bg-slate-100 px-2 py-1 rounded border border-slate-200 inline-block uppercase tracking-tighter"><i class="fa-solid fa-box-archive mr-1"></i>アーカイブ済</div>`;
-                    } else if (overdue) {
-                        alertBadge = `<div class="text-fuchsia-600 text-[10px] font-mono font-black mb-3 bg-fuchsia-50 px-2 py-1 rounded border border-fuchsia-200 inline-block uppercase tracking-tighter"><i class="fa-solid fa-triangle-exclamation mr-1"></i>納期遅れ</div>`;
-                    } else if (delayed) {
-                        alertBadge = `<div class="text-amber-600 text-[10px] font-mono font-black mb-3 bg-amber-50 px-2 py-1 rounded border border-amber-200 inline-block uppercase tracking-tighter"><i class="fa-solid fa-triangle-exclamation mr-1"></i>着手遅れ</div>`;
-                    }
-
-                    const dateColor = overdue ? 'text-fuchsia-600' : (delayed ? 'text-amber-600' : 'text-slate-400');
-                    const titleColor = overdue ? 'text-fuchsia-700' : 'text-slate-800';
-
-                    card.innerHTML = `
-                        <div class="absolute left-0 top-0 bottom-0 w-1.5" style="background-color: ${pColor}"></div>
-                        <input type="checkbox" class="absolute top-5 right-5 w-5 h-5 cursor-pointer bg-white border-2 border-slate-200 text-cyan-500 rounded focus:ring-cyan-500 z-10" 
-                               onclick="event.stopPropagation(); toggleTaskSelection('${task.id}', this.checked)" ${isSelected ? 'checked' : ''}>
-                        
-                        <div class="flex justify-between items-start mb-3 pl-4 pr-10">
-                            <span class="text-[10px] font-mono font-black px-2 py-1 rounded border border-slate-100 bg-slate-50 text-slate-500 truncate max-w-full uppercase tracking-tighter">${project ? project.name : '所属なし'}</span>
+                    colDiv.innerHTML = `
+                        <div class="p-4 border-b-2 border-slate-100 flex justify-between items-center bg-slate-50/50 ${borderTopClass}">
+                            <div class="flex items-center gap-3"><i class="fa-solid ${col.icon} ${titleColorClass}"></i><h3 class="font-black ${titleColorClass} text-sm font-mono tracking-widest uppercase">${col.title}</h3></div>
+                            <span class="bg-slate-800 text-white text-xs font-mono font-black px-2 py-0.5 rounded-full shadow-md">${colTasks.length}</span>
                         </div>
-                        <div class="pl-4">
-                            ${alertBadge}
-                            <h4 class="font-black ${titleColor} text-base mb-2 pr-6 leading-snug tracking-tight uppercase">${task.title}</h4>
-                            <div class="text-xs text-slate-400 line-clamp-2 mb-4 min-h-[2rem] font-mono font-bold leading-relaxed">${task.notes || ''}</div>
-                            <div class="flex items-center justify-between mt-auto pt-3 border-t border-slate-50">
-                                <div class="flex items-center gap-2 text-xs font-mono font-black text-cyan-600" title="Progress">
-                                    <i class="fa-solid fa-microchip"></i>
-                                    <span>${compSub}/${task.subtasks.length} (${Math.round(task.subtasks.reduce((sum, s) => sum + ((s.progress||0) * (s.hours||0)), 0) / (task.totalHours || 1))}%)</span>
-                                </div>
-                                <div class="flex items-center gap-2 text-xs font-mono font-black ${dateColor}"><i class="fa-regular fa-clock"></i><span>${task.dueDate ? task.dueDate.substring(5).replace('-','.') : '---'}</span></div>
-                            </div>
-                        </div>
-                        <div class="absolute bottom-0 left-0 right-0 bg-cyan-600 text-[10px] font-mono font-black text-center py-1 text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none uppercase tracking-widest">Execute_Command</div>
+                        <div class="p-4 flex-1 ${gridClass} drop-zone min-h-[150px] content-start" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="dropTask(event, '${col.id}', '${project.id || ''}')"></div>
                     `;
-                    taskContainer.appendChild(card);
+                    const taskContainer = colDiv.querySelector('.drop-zone');
+                    
+                    colTasks.forEach(task => {
+                        const compSub = task.subtasks.filter(s => s.completed).length;
+                        const isComp = isProjectCompleted(task.projectId);
+                        const overdue = isOverdue(task);
+                        const delayed = isDelayed(task);
+                        const isSelected = state.selectedTasks.has(task.id);
+
+                        const borderClass = overdue ? 'border-fuchsia-500 shadow-[0_0_15px_rgba(217,70,239,0.2)]' : (delayed ? 'border-amber-500' : (isSelected ? 'border-cyan-500 shadow-[0_0_15px_rgba(14,165,233,0.2)]' : 'border-slate-200'));
+                        const opacityClass = isComp ? 'opacity-50 grayscale-[0.5]' : '';
+
+                        const card = document.createElement('div');
+                        card.className = `task-card bg-white p-5 rounded-xl border-2 ${borderClass} ${opacityClass} hover:border-cyan-400 transition-all relative overflow-hidden group shadow-sm hover:shadow-md flex flex-col`;
+                        card.draggable = true;
+                        card.ondragstart = (e) => dragStart(e, task.id);
+                        card.ondblclick = () => openTaskModal(task.id);
+                        
+                        let alertBadge = '';
+                        if (isComp) {
+                            alertBadge = `<div class="text-slate-500 text-[10px] font-mono font-black mb-3 bg-slate-100 px-2 py-1 rounded border border-slate-200 inline-block uppercase tracking-tighter"><i class="fa-solid fa-box-archive mr-1"></i>アーカイブ済</div>`;
+                        } else if (overdue) {
+                            alertBadge = `<div class="text-fuchsia-600 text-[10px] font-mono font-black mb-3 bg-fuchsia-50 px-2 py-1 rounded border border-fuchsia-200 inline-block uppercase tracking-tighter"><i class="fa-solid fa-triangle-exclamation mr-1"></i>納期遅れ</div>`;
+                        } else if (delayed) {
+                            alertBadge = `<div class="text-amber-600 text-[10px] font-mono font-black mb-3 bg-amber-50 px-2 py-1 rounded border border-amber-200 inline-block uppercase tracking-tighter"><i class="fa-solid fa-triangle-exclamation mr-1"></i>着手遅れ</div>`;
+                        }
+
+                        const dateColor = overdue ? 'text-fuchsia-600' : (delayed ? 'text-amber-600' : 'text-slate-400');
+                        const titleColor = overdue ? 'text-fuchsia-700' : 'text-slate-800';
+
+                        card.innerHTML = `
+                            <div class="absolute left-0 top-0 bottom-0 w-1.5" style="background-color: ${project.color}"></div>
+                            <input type="checkbox" class="absolute top-4 right-4 w-5 h-5 cursor-pointer bg-white border-2 border-slate-200 text-cyan-500 rounded focus:ring-cyan-500 z-10" 
+                                   onclick="event.stopPropagation(); toggleTaskSelection('${task.id}', this.checked)" ${isSelected ? 'checked' : ''}>
+                            
+                            <div class="pl-3 flex-1 flex flex-col">
+                                ${alertBadge}
+                                <h4 class="font-black ${titleColor} text-sm mb-2 pr-6 leading-snug tracking-tight uppercase">${task.title}</h4>
+                                <div class="text-[11px] text-slate-400 line-clamp-2 mb-4 font-mono font-bold leading-relaxed">${task.notes || ''}</div>
+                                <div class="flex items-center justify-between mt-auto pt-3 border-t border-slate-50">
+                                    <div class="flex items-center gap-2 text-[11px] font-mono font-black text-cyan-600" title="Progress">
+                                        <i class="fa-solid fa-microchip"></i>
+                                        <span>${compSub}/${task.subtasks.length}</span>
+                                    </div>
+                                    <div class="flex items-center gap-2 text-[11px] font-mono font-black ${dateColor}"><i class="fa-regular fa-clock"></i><span>${task.dueDate ? task.dueDate.substring(5).replace('-','.') : '---'}</span></div>
+                                </div>
+                            </div>
+                            <div class="absolute bottom-0 left-0 right-0 bg-cyan-600 text-[10px] font-mono font-black text-center py-0.5 text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none uppercase tracking-widest">Execute_Command</div>
+                        `;
+                        taskContainer.appendChild(card);
+                    });
+                    
+                    lanesContainer.appendChild(colDiv);
                 });
-                container.appendChild(colDiv);
+                
+                projectDiv.appendChild(lanesContainer);
+                container.appendChild(projectDiv);
             });
         }
 
@@ -2256,7 +2311,8 @@
         function dragStart(ev, taskId) { draggedTaskId = taskId; ev.dataTransfer.setData("text/plain", taskId); setTimeout(() => ev.target.classList.add('opacity-50'), 0); }
         function allowDrop(ev) { ev.preventDefault(); ev.target.closest('.drop-zone')?.classList.add('drag-over'); }
         function dragLeave(ev) { ev.target.closest('.drop-zone')?.classList.remove('drag-over'); }
-        async function dropTask(ev, targetStatus) {
+        
+        async function dropTask(ev, targetStatus, targetProjectId) {
             ev.preventDefault(); ev.target.closest('.drop-zone')?.classList.remove('drag-over');
             if(!draggedTaskId) return;
             const task = state.tasks.find(t => t.id === draggedTaskId);
@@ -2265,6 +2321,9 @@
                 return;
             }
             task.status = targetStatus;
+            if (targetProjectId !== undefined) {
+                task.projectId = targetProjectId === '' ? null : targetProjectId;
+            }
             draggedTaskId = null;
             await saveDoc('tasks', task.id, task);
         }
