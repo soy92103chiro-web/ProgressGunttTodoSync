@@ -442,7 +442,7 @@
 </div>
 
 <div id="task-modal"
- class="bg-white border-2 border-slate-200 rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col hidden">
+ class="bg-white border-2 border-slate-200 rounded-3xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col hidden">
             <div class="px-8 py-6 border-b-2 border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-3xl">
                 <h2 class="text-base font-black text-cyan-700 italic" id="task-modal-title">タスク編集</h2>
                 <div class="flex items-center gap-4">
@@ -2803,7 +2803,7 @@
                                     </div>
                                     <div class="pt-4 border-t-2 border-slate-50">
                                         <label class="block text-xs font-black text-slate-500 mb-3">補足事項・メモ</label>
-                                        <textarea onchange="updateWorkingTask('notes', this.value)" rows="6" class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 text-sm font-medium text-slate-600 focus:border-cyan-500 outline-none transition-all resize-none" placeholder="タスクに関する詳細な指示や連絡事項を入力...">${workingTask.notes || ''}</textarea>
+                                        <textarea onchange="updateWorkingTask('notes', this.value)" rows="10" class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 text-sm font-medium text-slate-600 focus:border-cyan-500 outline-none transition-all resize-none" placeholder="タスクに関する詳細な指示や連絡事項を入力...">${workingTask.notes || ''}</textarea>
                                     </div>
                                 </div>
                             </div>
