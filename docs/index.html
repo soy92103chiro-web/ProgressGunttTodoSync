@@ -3340,19 +3340,34 @@
             return html;
         }
 
-        function generateLegend(projects) {
+        function generateLegend(projects, startDate, endDate) {
             const legendMap = new Map();
+            const startT = startDate ? startDate.getTime() : 0;
+            const endT = endDate ? endDate.getTime() : Infinity;
+
             projects.forEach(p => {
                 if(p.milestones) {
                     p.milestones.forEach(ms => {
-                        if(!legendMap.has(ms.name)) {
+                        let visible = false;
+                        if (startDate && endDate) {
+                            if (ms.type === 'point' && ms.date) {
+                                const t = new Date(ms.date).setHours(0,0,0,0);
+                                visible = (t >= startT && t <= endT);
+                            } else if (ms.type === 'range' && ms.startDate && ms.endDate) {
+                                const ts = new Date(ms.startDate).setHours(0,0,0,0);
+                                const te = new Date(ms.endDate).setHours(0,0,0,0);
+                                visible = (te >= startT && ts <= endT);
+                            }
+                        }
+
+                        if(visible && !legendMap.has(ms.name)) {
                             legendMap.set(ms.name, `<div class="flex items-center gap-1.5"><i class="fa-solid ${ms.icon||'fa-flag'}" style="color:${ms.color||'#4b5563'}"></i><span>${ms.name}</span></div>`);
                         }
                     });
                 }
             });
             let html = Array.from(legendMap.values()).join('<span class="mx-2 text-slate-800">|</span>');
-            if(!html) html = '<span class="text-slate-600">有効な案件データはありません</span>';
+            if(!html) html = '<span class="text-slate-600">表示中のマイルストーンはありません</span>';
             document.getElementById('gantt-legend').innerHTML = `<span class="font-bold text-slate-300 mr-3 uppercase tracking-widest"><i class="fa-solid fa-tags mr-2 text-cyan-500"></i>マイルストーン凡例:</span>${html}`;
         }
 
@@ -3423,10 +3438,11 @@
                 filteredProjects = filteredProjects.filter(p => state.ganttSelectedProjects.has(p.id));
             }
 
-            generateLegend(filteredProjects);
-
-            const filteredTasks = state.tasks.filter(t => filteredProjects.some(p => p.id === t.projectId));
+                        const filteredTasks = state.tasks.filter(t => filteredProjects.some(p => p.id === t.projectId));
             const { startDate, endDate } = getGanttDateRange(rangeType, filteredTasks, filteredProjects);
+            
+            generateLegend(filteredProjects, startDate, endDate);
+
             container.innerHTML = generateGanttHTML(startDate, endDate, filteredProjects, filteredTasks);
             
             if (rangeType === 'all') {
