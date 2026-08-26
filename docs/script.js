@@ -2179,7 +2179,7 @@
                 });
 
                 const colDiv = document.createElement('div');
-                colDiv.className = `flex flex-col bg-slate-200/50 rounded-2xl w-[400px] flex-shrink-0 max-h-full border-2 border-slate-200/60 shadow-inner`;
+                colDiv.className = `flex flex-col bg-slate-200/50 rounded-2xl w-full flex-shrink-0 border-2 border-slate-200/60 shadow-inner`;
                 
                 const titleColorClass = col.id === 'in_progress' ? 'text-cyan-700' : (col.id === 'done' ? 'text-fuchsia-700' : 'text-slate-500');
                 const borderTopClass = col.id === 'in_progress' ? 'border-t-4 border-cyan-500' : (col.id === 'done' ? 'border-t-4 border-fuchsia-500' : '');
@@ -2189,7 +2189,7 @@
                         <div class="flex items-center gap-3"><i class="fa-solid ${col.icon} ${titleColorClass} text-lg"></i><h3 class="font-black ${titleColorClass} text-sm font-mono tracking-widest uppercase">${col.title}</h3></div>
                         <span class="bg-slate-800 text-white text-xs font-mono font-black px-3 py-1 rounded-full shadow-md">${colTasks.length}</span>
                     </div>
-                    <div class="p-4 flex-1 overflow-y-auto space-y-5 drop-zone" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="dropTask(event, '${col.id}')"></div>
+                    <div class="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 min-h-[120px] drop-zone" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="dropTask(event, '${col.id}')"></div>
                 `;
                 const taskContainer = colDiv.querySelector('.drop-zone');
                 
