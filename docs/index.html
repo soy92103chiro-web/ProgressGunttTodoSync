@@ -1483,12 +1483,6 @@
 
             let allLogs = [];
             
-            // ALERT 2
-            if (state.currentView === 'dashboard') {
-                let taskDbg = state.tasks.slice(0, 3).map(t => `ID:${t.id}, logs:${t.memoLogs?t.memoLogs.length:0}`).join(', ');
-                alert("DEBUG 2\nTasks Length: " + state.tasks.length + "\nFilter: " + (document.getElementById('dashboard-project-filter')?.value) + "\n" + taskDbg);
-            }
-            
             state.tasks.forEach(t => {
                 if (currentFilter !== 'all' && t.projectId !== currentFilter) return;
                 const proj = state.projects.find(p => p.id === t.projectId) || { name: '不明', color: '#999' };
@@ -1563,7 +1557,11 @@
                 `;
             });
 
+            
+            // DEBUG 3
+            alert("DEBUG 3\nallLogs length: " + allLogs.length + "\nHTML length: " + html.length);
             container.innerHTML = html;
+
         }
 
         
