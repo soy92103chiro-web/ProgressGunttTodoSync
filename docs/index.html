@@ -397,25 +397,15 @@
 
         
 <!-- DASHBOARD VIEW -->
-<div id="view-dashboard" class="h-full flex gap-6 absolute inset-0 bg-slate-100 p-8 overflow-hidden hidden">
-    <div class="flex-1 flex flex-col bg-white rounded-2xl shadow-sm border-2 border-slate-200 overflow-hidden">
-        <div class="bg-cyan-50 px-6 py-4 border-b-2 border-cyan-100 flex justify-between items-center">
-            <span class="font-black text-cyan-800 text-lg tracking-widest"><i class="fa-solid fa-list-check mr-3 text-cyan-600"></i>今日のTODO</span>
-        </div>
-        <div id="dashboard-todo-list" class="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50"></div>
-    </div>
-    <div class="w-1/3 min-w-[300px] flex flex-col bg-white rounded-2xl shadow-sm border-2 border-slate-200 overflow-hidden">
-        <div class="bg-amber-50 px-6 py-4 border-b-2 border-amber-100 flex justify-between items-center">
-            <span class="font-black text-amber-800 text-lg tracking-widest"><i class="fa-solid fa-note-sticky mr-3 text-amber-600"></i>タスクメモ</span>
-        </div>
-        <div class="flex-1 p-6 bg-slate-50 flex flex-col">
-            <div id="dashboard-memo-title" class="text-sm font-bold text-slate-500 mb-3 truncate">タスクを選択してください</div>
-            <textarea id="dashboard-memo-input" class="flex-1 bg-white border-2 border-slate-200 rounded-lg p-4 resize-none outline-none focus:border-amber-400 font-mono text-sm" placeholder="選択したタスクのメモを編集..." disabled></textarea>
-            <div class="mt-4 flex justify-end">
-                <button id="dashboard-memo-save" onclick="saveDashboardMemo()" class="bg-amber-500 hover:bg-amber-600 text-white font-bold px-6 py-2 rounded-lg shadow-sm disabled:opacity-50 transition-all" disabled>保存</button>
-            </div>
+<div id="view-dashboard" class="h-full flex flex-col absolute inset-0 bg-slate-100 p-8 overflow-hidden hidden">
+    <div class="mb-6 flex justify-between items-center bg-white p-6 rounded-2xl border-2 border-slate-200 shadow-sm">
+        <h2 class="text-xl font-black text-amber-600 tracking-widest"><i class="fa-solid fa-timeline mr-3"></i>メモ・タイムライン</h2>
+        <div class="flex items-center gap-4">
+            <label class="text-xs font-bold text-slate-500 uppercase tracking-widest">案件絞り込み:</label>
+            <select id="dashboard-project-filter" onchange="renderDashboard()" class="bg-slate-50 border-2 border-slate-200 rounded-lg text-sm py-2 px-4 focus:border-amber-500 outline-none text-slate-700 font-bold"></select>
         </div>
     </div>
+    <div id="dashboard-timeline-container" class="flex-1 overflow-y-auto space-y-8 pb-10 custom-scrollbar pr-4"></div>
 </div>
 
 <!-- REGULAR MEETING MODAL -->
