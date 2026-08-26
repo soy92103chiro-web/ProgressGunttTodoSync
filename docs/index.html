@@ -1844,7 +1844,8 @@
                                 blocksHtml += `
                                     <div class="absolute left-14 right-2 rounded-lg border-2 shadow-md group overflow-hidden cursor-grab active:cursor-grabbing hover:scale-[1.02] transition-all z-10"
                                          style="top: calc(${a.startSlot} * var(--slot-height)); height: calc(${a.duration} * var(--slot-height)); background-color: ${pColor}10; border-color: ${borderCol}60; box-shadow: 0 4px 10px rgba(0,0,0,0.05);"
-                                         draggable="true" ondragstart="dragStartWeeklyTimeline(event, '${t.id}', '${st.id}', '${a.date}', ${a.startSlot}, ${a.duration})">
+                                         draggable="true" ondragstart="dragStartWeeklyTimeline(event, '${t.id}', '${st.id}', '${a.date}', ${a.startSlot}, ${a.duration})"
+                                         ondblclick="openTaskModal('${t.id}')">
                                         <div class="absolute left-0 top-0 bottom-0 w-1.5" style="background-color: ${pColor}; shadow: 2px 0 5px rgba(0,0,0,0.1);"></div>
                                         <div class="pl-4 pt-1.5 pr-8 text-slate-800 leading-tight w-full h-full overflow-hidden font-mono font-bold">
                                             <div class="truncate text-[10px] ${overdue ? 'text-fuchsia-600 font-black' : 'text-slate-400 font-black'} uppercase tracking-tighter">${t.title}</div>
