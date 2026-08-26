@@ -337,7 +337,7 @@
                 </div>
 
                 <div class="flex-1 flex gap-6 overflow-hidden">
-                <div class="w-1/4 min-w-[340px] max-w-[400px] flex flex-col gap-6 flex-shrink-0">
+                <div class="w-1/3 min-w-[420px] max-w-[600px] flex flex-col gap-6 flex-shrink-0">
                     <div class="flex-1 flex flex-col bg-white border-2 border-slate-200 rounded-2xl overflow-hidden shadow-sm">
                         <div class="bg-slate-50 px-6 py-4 border-b-2 border-slate-100 flex justify-between items-center">
                             <span class="font-black text-slate-700 text-sm uppercase tracking-widest"><i class="fa-solid fa-inbox mr-3 text-cyan-600"></i>未割当のタスク</span>
@@ -1739,6 +1739,7 @@
 
                     let assignBadge = '';
                     const isFull = assignedH > 0 && assignedH >= remH;
+                    if (task.projectId === 'adhoc-project' && isFull) return;
                     if (assignedH > 0) {
                         const pct = remH > 0 ? Math.round(Math.min(100, (assignedH / remH) * 100)) : 100;
                         const colorClass = isFull ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-cyan-50 text-cyan-700 border-cyan-200';
@@ -1814,6 +1815,8 @@
             for (let i = 0; i < 7; i++) {
                 const targetDate = new Date(baseDate);
                 targetDate.setDate(targetDate.getDate() + i);
+                const dayOfWeek = targetDate.getDay();
+                if (dayOfWeek === 0 || dayOfWeek === 6) continue;
                 const dateStr = dateUtils.formatDate(targetDate);
                 const dayStr = dateUtils.getJapaneseDay(targetDate);
                 const isHol = !isBusinessDay(targetDate);
