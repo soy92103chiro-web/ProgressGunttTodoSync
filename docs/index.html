@@ -996,7 +996,23 @@
                 if (snapshot.empty) {
                     for (let t of initialSeedData.tasks) await saveDoc('tasks', t.id, t);
                 } else {
-                    state.tasks = snapshot.docs.map(doc => doc.data());
+                    state.tasks = snapshot.docs.map(doc => {
+                        let t = doc.data();
+                        if (typeof t.notes === 'string' && t.notes.trim() !== '') {
+                            t.memoLogs = t.memoLogs || [];
+                            t.memoLogs.push({ id: generateId(), timestamp: t.dueDate ? new Date(t.dueDate).toISOString() : new Date().toISOString(), content: t.notes });
+                            t.notes = '';
+                        }
+                        t.subtasks = t.subtasks || [];
+                        t.subtasks.forEach(st => {
+                            if (typeof st.notes === 'string' && st.notes.trim() !== '') {
+                                st.memoLogs = st.memoLogs || [];
+                                st.memoLogs.push({ id: generateId(), timestamp: t.dueDate ? new Date(t.dueDate).toISOString() : new Date().toISOString(), content: st.notes });
+                                st.notes = '';
+                            }
+                        });
+                        return t;
+                    });
                     refreshCurrentView();
                 }
             }, (error) => console.error("Tasks Error:", error)));
