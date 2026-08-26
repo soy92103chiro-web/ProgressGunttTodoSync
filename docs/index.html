@@ -1504,7 +1504,8 @@
             allLogs.sort((a, b) => b.dateObj - a.dateObj);
 
             if (allLogs.length === 0) {
-                container.innerHTML = '<div class="text-center text-slate-400 mt-20"><i class="fa-solid fa-wind text-4xl mb-4"></i><p>表示するメモ履歴がありません</p></div>';
+                let dbg = state.tasks.map(t => `ID:${t.id}, Notes:'${t.notes}', MemoLen:${t.memoLogs ? t.memoLogs.length : 0}`).join('<br>');
+                container.innerHTML = '<div class="text-center text-slate-400 mt-20"><i class="fa-solid fa-wind text-4xl mb-4"></i><p>表示するメモ履歴がありません</p><div class="mt-4 text-xs text-left bg-slate-100 p-4 rounded overflow-y-auto max-h-40">' + dbg + '</div></div>';
                 return;
             }
 
@@ -3721,7 +3722,7 @@
             showModal, closeModal, showDialog,
             // Task Management
             openTaskModal, updateTaskTemplatesDropdown, loadTaskTemplate,
-            saveAsTemplate, deleteTaskTemplate, deleteCurrentTask, updateWorkingTask,
+            saveAsTemplate, deleteTaskTemplate, deleteCurrentTask, updateWorkingTask, addTaskMemoLog, deleteTaskMemoLog, addSubtaskMemoLog, deleteSubtaskMemoLog,
             addSubtask, removeSubtask, handleSubtaskChange, saveTask,
             // Milestone Management
             addMilestoneRow, removeMilestoneRow, moveMilestone, handleMilestoneChange, validateDynamicMilestones,
