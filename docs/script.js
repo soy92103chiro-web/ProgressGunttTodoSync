@@ -2180,10 +2180,15 @@
                 }
             });
             
-            swimlaneProjects.sort((a, b) => {
+                        swimlaneProjects.sort((a, b) => {
                 const compA = isProjectCompleted(a.id);
                 const compB = isProjectCompleted(b.id);
                 if (compA !== compB) return compA ? 1 : -1;
+                
+                const activeA = filterTasks.some(t => (t.projectId || null) === a.id && (t.status === 'todo' || t.status === 'in_progress'));
+                const activeB = filterTasks.some(t => (t.projectId || null) === b.id && (t.status === 'todo' || t.status === 'in_progress'));
+                if (activeA !== activeB) return activeA ? -1 : 1;
+                
                 return a.name.localeCompare(b.name);
             });
 
