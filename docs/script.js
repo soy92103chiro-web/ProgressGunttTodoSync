@@ -2786,7 +2786,7 @@
             // Weekly View
             renderWeekly, dragStartWeeklyPool, dragStartWeeklyTimeline, allowWeeklyDropContainer,
             dragWeeklyLeaveContainer, dropWeeklyContainer, unassignBlock, dropToPool,
-            dragStartWeeklyAdhoc, addCustomAdHocTemplate, toggleSubtaskNote,
+            dragStartWeeklyAdhoc, addCustomAdHocTemplate, toggleSubtaskNote, toggleSubtaskNoteAlt,
             // Kanban View
             renderKanban, toggleTaskSelection, duplicateSelectedTasks, deleteSelectedTasks,
             dragStart, allowDrop, dragLeave, dropTask,
