@@ -1910,43 +1910,79 @@
         function renderTaskModalContent() {
             const body = document.getElementById('task-modal-body');
             let projOpts = state.projects.map(p => `<option value="${p.id}" ${workingTask.projectId === p.id ? 'selected' : ''}>${p.name}</option>`).join('');
-            let stHtml = workingTask.subtasks.map(st => `
-                <div class="mb-4 p-4 bg-slate-50 border border-slate-200 rounded-xl shadow-sm transition-all hover:border-cyan-400">
-                    <div class="flex flex-wrap items-center gap-4">
+            
+            const renderSt = (st) => `
+                <div class="mb-4 p-4 bg-white border border-slate-200 rounded-xl shadow-sm transition-all hover:border-cyan-400">
+                    <div class="flex flex-col gap-3">
                         <div class="flex items-center gap-2">
-                            <input type="checkbox" ${st.completed ? 'checked' : ''} onchange="handleSubtaskChange('${st.id}', 'checked', this.checked)" class="w-6 h-6 bg-white border-slate-300 text-cyan-600 rounded cursor-pointer focus:ring-cyan-500">
+                            <input type="checkbox" ${st.completed ? 'checked' : ''} onchange="handleSubtaskChange('${st.id}', 'checked', this.checked)" class="w-5 h-5 bg-white border-slate-300 text-cyan-600 rounded cursor-pointer focus:ring-cyan-500 shrink-0">
+                            <input type="text" value="${st.title}" onchange="handleSubtaskChange('${st.id}', 'title', this.value)" placeholder="小タスク名" class="w-full text-sm font-bold border-b-2 border-slate-100 hover:border-slate-300 focus:border-cyan-500 rounded-none px-2 py-1 bg-transparent text-slate-800 transition-all">
                         </div>
-                        <div class="flex-1 min-w-[200px]">
-                            <input type="text" value="${st.title}" onchange="handleSubtaskChange('${st.id}', 'title', this.value)" placeholder="小タスク名（例：基本設計、図面チェック）" class="w-full text-sm font-bold border-b-2 border-slate-100 hover:border-slate-300 focus:border-cyan-500 rounded-none px-2 py-1 bg-transparent text-slate-800 transition-all">
-                        </div>
-                        <div class="flex items-center gap-4">
-                            <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-3 flex-wrap">
+                            <div class="flex items-center gap-1">
                                 <span class="text-[10px] font-black text-slate-500">進捗</span>
-                                <input type="number" min="0" max="100" value="${st.progress || 0}" onchange="handleSubtaskChange('${st.id}', 'progress', this.value)" class="w-16 text-sm font-bold bg-white border-2 border-slate-200 rounded-lg px-2 py-1 text-right text-cyan-600 focus:border-cyan-500 outline-none">
+                                <input type="number" min="0" max="100" value="${st.progress || 0}" onchange="handleSubtaskChange('${st.id}', 'progress', this.value)" class="w-14 text-sm font-bold bg-white border-2 border-slate-200 rounded-lg px-2 py-1 text-right text-cyan-600 focus:border-cyan-500 outline-none">
                                 <span class="text-[10px] text-slate-400 font-bold">%</span>
                             </div>
-                            <div class="flex items-center gap-2">
+                            <div class="flex items-center gap-1">
                                 <span class="text-[10px] font-black text-slate-500">工数</span>
-                                <input type="number" min="0" step="0.5" value="${st.hours}" onchange="handleSubtaskChange('${st.id}', 'hours', this.value)" class="w-16 text-sm font-bold bg-white border-2 border-slate-200 rounded-lg px-2 py-1 text-right text-slate-700 focus:border-cyan-500 outline-none" placeholder="0.0">
+                                <input type="number" min="0" step="0.5" value="${st.hours}" onchange="handleSubtaskChange('${st.id}', 'hours', this.value)" class="w-14 text-sm font-bold bg-white border-2 border-slate-200 rounded-lg px-2 py-1 text-right text-slate-700 focus:border-cyan-500 outline-none" placeholder="0.0">
                                 <span class="text-[10px] text-slate-400 font-bold">h</span>
                             </div>
-                            <button onclick="toggleSubtaskNote('st-note-${st.id}', 'st-note-icon-${st.id}')" class="text-slate-400 hover:text-cyan-600 p-2 transition-colors" title="メモを表示">
-                                <i id="st-note-icon-${st.id}" class="fa-solid ${st.notes ? 'fa-comment-dots text-cyan-500' : 'fa-comment-dots'} text-xl"></i>
-                            </button>
-                            <button onclick="removeSubtask('${st.id}')" class="text-slate-300 hover:text-red-500 px-2 transition-all"><i class="fa-solid fa-trash-can text-lg"></i></button>
+                            <div class="ml-auto flex gap-1">
+                                <button onclick="toggleSubtaskNoteAlt('st-note-${st.id}', 'st-note-icon-${st.id}', '${st.id}')" class="text-slate-400 hover:text-cyan-600 p-2 transition-colors" title="メモを表示">
+                                    <i id="st-note-icon-${st.id}" class="fa-solid ${(st.memoLogs && st.memoLogs.length > 0) ? 'fa-comment-dots text-cyan-500' : 'fa-comment-dots'}"></i>
+                                </button>
+                                <button onclick="removeSubtask('${st.id}')" class="text-slate-300 hover:text-red-500 p-2 transition-all"><i class="fa-solid fa-trash-can"></i></button>
+                            </div>
                         </div>
                     </div>
-                    <div id="st-note-${st.id}" class="mt-4 pl-9 ${st.notes ? '' : 'hidden'}">
-                        <textarea onchange="handleSubtaskChange('${st.id}', 'notes', this.value)" rows="2" class="w-full bg-slate-100 border-2 border-slate-200 rounded-xl px-4 py-3 text-sm font-medium text-slate-600 focus:border-cyan-500 outline-none transition-all" placeholder="詳細な進捗状況やメモを入力してください...">${st.notes || ''}</textarea>
+                    <div id="st-note-${st.id}" class="mt-4 pl-7 ${(st.memoLogs && st.memoLogs.length > 0) || st.showMemoInput ? '' : 'hidden'}">
+                        <div class="space-y-3 mb-3 max-h-40 overflow-y-auto custom-scrollbar pr-2">
+                            ${(st.memoLogs || []).map(log => `
+                                <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 shadow-sm relative group">
+                                    <div class="flex justify-between items-center mb-1">
+                                        <div class="text-[10px] text-slate-400 font-bold">${dateUtils.formatDateTime(new Date(log.timestamp))}</div>
+                                        <button onclick="deleteSubtaskMemoLog('${st.id}', '${log.id}')" class="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><i class="fa-solid fa-trash-can text-[10px]"></i></button>
+                                    </div>
+                                    <div class="text-xs text-slate-700 whitespace-pre-wrap">${log.content}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                        <div class="flex items-start gap-2">
+                            <textarea id="st-note-input-${st.id}" rows="2" class="w-full bg-white border-2 border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-600 focus:border-cyan-500 outline-none transition-all" placeholder="新しいメモを入力..."></textarea>
+                            <button onclick="addSubtaskMemoLog('${st.id}')" class="bg-cyan-600 text-white px-3 py-2 rounded-xl hover:bg-cyan-700 transition-all shadow-sm text-xs font-bold whitespace-nowrap"><i class="fa-solid fa-paper-plane"></i></button>
+                        </div>
                     </div>
                 </div>
-            `).join('');
-            
-            if(!stHtml) stHtml = `
-                <div class="text-center py-12 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50">
-                    <p class="text-sm font-bold text-slate-400">小タスクが登録されていません</p>
-                    <button onclick="addSubtask()" class="mt-4 px-6 py-2.5 bg-cyan-600 text-white rounded-xl text-xs font-bold hover:bg-cyan-700 shadow-md transition-all">小タスクを追加する</button>
-                </div>`;
+            `;
+
+            const stTodo = workingTask.subtasks.filter(st => !st.completed && (!st.progress || st.progress === 0));
+            const stInProgress = workingTask.subtasks.filter(st => !st.completed && st.progress > 0);
+            const stDone = workingTask.subtasks.filter(st => st.completed || st.progress === 100);
+
+            let stHtml = `
+                <div id="subtask-kanban-container" class="flex gap-4 overflow-x-auto pb-4 custom-scrollbar">
+                    <div class="w-[320px] shrink-0 bg-slate-100/60 rounded-2xl p-4 border border-slate-200/60">
+                        <h4 class="text-xs font-black text-slate-500 mb-4 border-b-2 border-slate-200 pb-2 flex justify-between">未着手 <span class="bg-white px-2 py-0.5 rounded-full shadow-sm">${stTodo.length}</span></h4>
+                        <div class="space-y-3">
+                            ${stTodo.length ? stTodo.map(renderSt).join('') : '<div class="text-[10px] text-slate-400 text-center py-4">なし</div>'}
+                        </div>
+                    </div>
+                    <div class="w-[320px] shrink-0 bg-cyan-50/60 rounded-2xl p-4 border border-cyan-100">
+                        <h4 class="text-xs font-black text-cyan-600 mb-4 border-b-2 border-cyan-100 pb-2 flex justify-between">進行中 <span class="bg-white px-2 py-0.5 rounded-full shadow-sm">${stInProgress.length}</span></h4>
+                        <div class="space-y-3">
+                            ${stInProgress.length ? stInProgress.map(renderSt).join('') : '<div class="text-[10px] text-slate-400 text-center py-4">なし</div>'}
+                        </div>
+                    </div>
+                    <div class="w-[320px] shrink-0 bg-fuchsia-50/60 rounded-2xl p-4 border border-fuchsia-100">
+                        <h4 class="text-xs font-black text-fuchsia-600 mb-4 border-b-2 border-fuchsia-100 pb-2 flex justify-between">完了 <span class="bg-white px-2 py-0.5 rounded-full shadow-sm">${stDone.length}</span></h4>
+                        <div class="space-y-3">
+                            ${stDone.length ? stDone.map(renderSt).join('') : '<div class="text-[10px] text-slate-400 text-center py-4">なし</div>'}
+                        </div>
+                    </div>
+                </div>
+            `;
 
             body.innerHTML = `
                 <div class="space-y-12">
@@ -1995,7 +2031,7 @@
 
                     <!-- 小タスク管理セクション -->
                     <div class="grid grid-cols-1 lg:grid-cols-12 gap-10">
-                        <div class="lg:col-span-7 space-y-6">
+                        <div class="lg:col-span-12 space-y-6">
                             <div class="flex justify-between items-center px-2">
                                 <h3 class="text-xs font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
                                     <i class="fa-solid fa-list-check text-cyan-600"></i> 小タスク（作業内容）
@@ -2004,13 +2040,11 @@
                                     <i class="fa-solid fa-plus mr-1.5"></i> 追加する
                                 </button>
                             </div>
-                            <div class="max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
-                                ${stHtml}
-                            </div>
+                            <div class="max-h-[500px] overflow-y-auto custom-scrollbar">${stHtml}</div>
                         </div>
 
                         <!-- サマリー・メモ セクション -->
-                        <div class="lg:col-span-5 space-y-8">
+                        <div class="lg:col-span-12 space-y-8 mt-4">
                             <div class="bg-white p-8 border-2 border-slate-100 rounded-3xl shadow-sm space-y-8">
                                 <div class="flex justify-between items-center border-b-2 border-slate-50 pb-6">
                                     <span class="text-xs font-black text-slate-400 uppercase tracking-widest">集計結果</span>
@@ -2046,6 +2080,12 @@
         function removeSubtask(id) { workingTask.subtasks = workingTask.subtasks.filter(s => s.id !== id); recalculateDates(); renderTaskModalContent(); }
         function handleSubtaskChange(id, field, value) {
             const st = workingTask.subtasks.find(s => s.id === id); if(!st) return;
+            
+            const body = document.getElementById('task-modal-body');
+            const stContainer = document.getElementById('subtask-kanban-container');
+            const scrollTop = body ? body.scrollTop : 0;
+            const scrollLeft = stContainer ? stContainer.scrollLeft : 0;
+            
             if(field === 'hours') { st.hours = parseFloat(value) || 0; recalculateDates(); renderTaskModalContent(); }
             else if(field === 'progress') {
                 let p = parseInt(value) || 0; p = p > 100 ? 100 : (p < 0 ? 0 : p);
@@ -2057,6 +2097,11 @@
                 checkSubtaskStatusRules(); renderTaskModalContent();
             }
             else { st[field] = value; }
+            
+            const newBody = document.getElementById('task-modal-body');
+            if (newBody) newBody.scrollTop = scrollTop;
+            const newStContainer = document.getElementById('subtask-kanban-container');
+            if (newStContainer) newStContainer.scrollLeft = scrollLeft;
         }
 
         function adjustToBusinessDay(dateStr, direction = -1) {
