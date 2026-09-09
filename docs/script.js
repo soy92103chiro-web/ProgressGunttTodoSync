@@ -1908,6 +1908,10 @@
         }
 
         function renderTaskModalContent() {
+            const bodyScrollEl = document.getElementById('task-modal-body');
+            const stContainerEl = document.getElementById('subtask-kanban-container');
+            const savedScrollTop = bodyScrollEl ? bodyScrollEl.scrollTop : 0;
+            const savedScrollLeft = stContainerEl ? stContainerEl.scrollLeft : 0;
             const body = document.getElementById('task-modal-body');
             let projOpts = state.projects.map(p => `<option value="${p.id}" ${workingTask.projectId === p.id ? 'selected' : ''}>${p.name}</option>`).join('');
             
