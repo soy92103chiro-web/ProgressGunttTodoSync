@@ -365,6 +365,21 @@
                 </div>
             </div>
         </div>
+        <!-- DASHBOARD VIEW -->
+<div id="view-dashboard" class="h-full flex flex-col absolute inset-0 bg-slate-100 p-6 overflow-hidden hidden">
+    <div class="mb-4 flex flex-col gap-4 bg-white p-5 rounded-2xl border-2 border-slate-200 shadow-sm shrink-0">
+        <div class="flex justify-between items-center">
+            <h2 class="text-xl font-black text-amber-600 tracking-widest min-w-max"><i class="fa-solid fa-timeline mr-3"></i>メモ・タイムライン</h2>
+            <input type="hidden" id="dashboard-project-filter" value="all">
+        </div>
+        <div id="dashboard-tabs-container" class="flex items-center gap-2 overflow-x-auto custom-scrollbar pb-2">
+            <!-- Tabs will be rendered here -->
+        </div>
+    </div>
+    <div id="dashboard-timeline-container" class="flex-1 overflow-y-auto pb-10 custom-scrollbar pr-4"></div>
+</div>
+
+
     </main>
 
     <div id="modal-overlay" class="fixed inset-0 bg-slate-200 bg-opacity-60 z-50 hidden flex items-center justify-center backdrop-blur-md transition-opacity">
@@ -397,20 +412,6 @@
         </div>
 
         
-<!-- DASHBOARD VIEW -->
-<div id="view-dashboard" class="h-full flex flex-col absolute inset-0 bg-slate-100 p-6 overflow-hidden hidden">
-    <div class="mb-4 flex flex-col gap-4 bg-white p-5 rounded-2xl border-2 border-slate-200 shadow-sm shrink-0">
-        <div class="flex justify-between items-center">
-            <h2 class="text-xl font-black text-amber-600 tracking-widest min-w-max"><i class="fa-solid fa-timeline mr-3"></i>メモ・タイムライン</h2>
-            <input type="hidden" id="dashboard-project-filter" value="all">
-        </div>
-        <div id="dashboard-tabs-container" class="flex items-center gap-2 overflow-x-auto custom-scrollbar pb-2">
-            <!-- Tabs will be rendered here -->
-        </div>
-    </div>
-    <div id="dashboard-timeline-container" class="flex-1 overflow-y-auto pb-10 custom-scrollbar pr-4"></div>
-</div>
-
 <!-- REGULAR MEETING MODAL -->
 <div id="regular-meeting-modal" class="bg-white border-2 border-slate-200 rounded-3xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col hidden">
     <div class="p-6 border-b-2 border-slate-100 flex justify-between items-center bg-cyan-50 rounded-t-3xl">
