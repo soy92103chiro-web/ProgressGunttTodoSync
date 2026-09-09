@@ -1674,19 +1674,19 @@
                     dateInputHtml = `
                         <div class="flex items-center gap-2">
                             <span class="text-[10px] font-black text-slate-400 uppercase">日付</span>
-                            <input type="date" value="${ms.date}" onchange="handleMilestoneChange(${idx}, 'date', this.value)" class="bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-2 text-sm font-bold text-slate-700 focus:border-cyan-500 outline-none w-44 shadow-inner transition-all">
+                            <input type="date" value="${ms.date}" onchange="handleMilestoneChange(${idx}, 'date', this.value)" class="bg-slate-50 border-2 border-slate-100 rounded-xl px-2 py-2 text-sm font-bold text-slate-700 focus:border-cyan-500 outline-none w-[135px] shadow-inner transition-all">
                         </div>`;
                 } else {
                     dateInputHtml = `
                         <div class="flex items-center gap-3">
                             <div class="flex items-center gap-2">
                                 <span class="text-[10px] font-black text-slate-400 uppercase">開始</span>
-                                <input type="date" value="${ms.startDate}" onchange="handleMilestoneChange(${idx}, 'startDate', this.value)" class="bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-2 text-sm font-bold text-slate-700 focus:border-cyan-500 outline-none w-44 shadow-inner transition-all">
+                                <input type="date" value="${ms.startDate}" onchange="handleMilestoneChange(${idx}, 'startDate', this.value)" class="bg-slate-50 border-2 border-slate-100 rounded-xl px-2 py-2 text-sm font-bold text-slate-700 focus:border-cyan-500 outline-none w-[135px] shadow-inner transition-all">
                             </div>
                             <span class="text-slate-300 font-bold">〜</span>
                             <div class="flex items-center gap-2">
                                 <span class="text-[10px] font-black text-slate-400 uppercase">終了</span>
-                                <input type="date" value="${ms.endDate}" onchange="handleMilestoneChange(${idx}, 'endDate', this.value)" class="bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-2 text-sm font-bold text-slate-700 focus:border-cyan-500 outline-none w-44 shadow-inner transition-all">
+                                <input type="date" value="${ms.endDate}" onchange="handleMilestoneChange(${idx}, 'endDate', this.value)" class="bg-slate-50 border-2 border-slate-100 rounded-xl px-2 py-2 text-sm font-bold text-slate-700 focus:border-cyan-500 outline-none w-[135px] shadow-inner transition-all">
                             </div>
                         </div>`;
                 }
@@ -1696,7 +1696,7 @@
                         <button onclick="moveMilestone(${idx}, -1)" class="text-slate-300 hover:text-cyan-500 transition-colors ${idx===0?'invisible':''}"><i class="fa-solid fa-chevron-up text-lg"></i></button>
                         <button onclick="moveMilestone(${idx}, 1)" class="text-slate-300 hover:text-cyan-500 transition-colors ${idx===editingMilestones.length-1?'invisible':''}"><i class="fa-solid fa-chevron-down text-lg"></i></button>
                     </div>
-                    <div class="flex-1 flex items-center gap-4 flex-nowrap min-w-[300px]">
+                    <div class="flex-1 flex items-center gap-4 flex-wrap xl:flex-nowrap min-w-[300px]">
                         <div class="flex-1 min-w-[180px]">
                             <span class="block text-[9px] font-black text-slate-400 mb-1 uppercase tracking-widest">工程名</span>
                             <input type="text" value="${ms.name}" onchange="handleMilestoneChange(${idx}, 'name', this.value)" placeholder="例：基本設計完了" class="w-full bg-transparent border-b-2 border-slate-100 focus:border-cyan-500 outline-none text-slate-800 text-sm font-bold py-1 transition-all">
