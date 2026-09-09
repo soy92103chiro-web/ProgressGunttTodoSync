@@ -398,15 +398,17 @@
 
         
 <!-- DASHBOARD VIEW -->
-<div id="view-dashboard" class="h-full flex flex-col absolute inset-0 bg-slate-100 p-8 overflow-hidden hidden">
-    <div class="mb-6 flex justify-between items-center bg-white p-6 rounded-2xl border-2 border-slate-200 shadow-sm">
-        <h2 class="text-xl font-black text-amber-600 tracking-widest"><i class="fa-solid fa-timeline mr-3"></i>メモ・タイムライン</h2>
-        <div class="flex items-center gap-4">
-            <label class="text-xs font-bold text-slate-500 uppercase tracking-widest">案件絞り込み:</label>
-            <select id="dashboard-project-filter" onchange="renderDashboard()" class="bg-slate-50 border-2 border-slate-200 rounded-lg text-sm py-2 px-4 focus:border-amber-500 outline-none text-slate-700 font-bold"></select>
+<div id="view-dashboard" class="h-full flex flex-col absolute inset-0 bg-slate-100 p-6 overflow-hidden hidden">
+    <div class="mb-4 flex flex-col gap-4 bg-white p-5 rounded-2xl border-2 border-slate-200 shadow-sm shrink-0">
+        <div class="flex justify-between items-center">
+            <h2 class="text-xl font-black text-amber-600 tracking-widest min-w-max"><i class="fa-solid fa-timeline mr-3"></i>メモ・タイムライン</h2>
+            <input type="hidden" id="dashboard-project-filter" value="all">
+        </div>
+        <div id="dashboard-tabs-container" class="flex items-center gap-2 overflow-x-auto custom-scrollbar pb-2">
+            <!-- Tabs will be rendered here -->
         </div>
     </div>
-    <div id="dashboard-timeline-container" class="flex-1 overflow-y-auto space-y-8 pb-10 custom-scrollbar pr-4"></div>
+    <div id="dashboard-timeline-container" class="flex-1 overflow-y-auto pb-10 custom-scrollbar pr-4"></div>
 </div>
 
 <!-- REGULAR MEETING MODAL -->
@@ -1471,23 +1473,30 @@
             const container = document.getElementById('dashboard-timeline-container');
             if (!container) return;
 
-            const pFilter = document.getElementById('dashboard-project-filter')?.value;
-            if (pFilter === undefined || pFilter === '') {
-                const sel = document.getElementById('dashboard-project-filter');
-                if (sel) {
-                    sel.innerHTML = '<option value="all">すべての案件</option>' + 
-                        state.projects.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
-                }
+            const filterInput = document.getElementById('dashboard-project-filter');
+            let currentFilter = filterInput ? filterInput.value : 'all';
+
+            const tabProjects = state.projects.filter(p => !p.name.includes('臨時') && !p.name.includes('事務'));
+            if (currentFilter !== 'all' && !tabProjects.find(p => p.id === currentFilter)) {
+                currentFilter = 'all';
+                if (filterInput) filterInput.value = 'all';
             }
 
-            const currentFilter = document.getElementById('dashboard-project-filter')?.value || 'all';
+            const tabsContainer = document.getElementById('dashboard-tabs-container');
+            if (tabsContainer) {
+                let tabsHtml = `<button onclick="document.getElementById('dashboard-project-filter').value='all'; renderDashboard()" class="shrink-0 px-4 py-1.5 text-sm font-bold rounded-xl transition-colors ${currentFilter === 'all' ? 'bg-amber-100 text-amber-700 border-2 border-amber-300' : 'bg-slate-50 text-slate-500 hover:bg-slate-200 border-2 border-slate-100'}">すべての案件</button>`;
+                
+                tabProjects.forEach(p => {
+                    tabsHtml += `<button onclick="document.getElementById('dashboard-project-filter').value='${p.id}'; renderDashboard()" class="shrink-0 px-4 py-1.5 text-sm font-bold rounded-xl transition-colors ${currentFilter === p.id ? 'bg-amber-100 text-amber-700 border-2 border-amber-300' : 'bg-slate-50 text-slate-500 hover:bg-slate-200 border-2 border-slate-100'}">${p.name}</button>`;
+                });
+                tabsContainer.innerHTML = tabsHtml;
+            }
 
             let allLogs = [];
-            
             state.tasks.forEach(t => {
                 if (currentFilter !== 'all' && t.projectId !== currentFilter) return;
                 const proj = state.projects.find(p => p.id === t.projectId) || { name: '不明', color: '#999' };
-                if (currentFilter === 'all' && (proj.name.includes('臨時') || proj.name.includes('事務'))) return;
+                if (proj.name.includes('臨時') || proj.name.includes('事務')) return;
 
                 if (t.memoLogs) {
                     t.memoLogs.forEach(log => {
@@ -1506,8 +1515,6 @@
 
             allLogs.sort((a, b) => b.dateObj - a.dateObj);
 
-            
-
             const logsByProject = {};
             allLogs.forEach(log => {
                 if (!logsByProject[log.projectId]) logsByProject[log.projectId] = [];
@@ -1523,40 +1530,41 @@
                 const pName = logs[0].projectName;
 
                 html += `
-                <div class="bg-white rounded-3xl border-2 border-slate-200 shadow-sm overflow-hidden">
-                    <div class="px-6 py-4 border-b-2 border-slate-100 flex items-center gap-3" style="background-color: ${pColor}10;">
-                        <div class="w-4 h-4 rounded-full shadow-sm" style="background-color: ${pColor}"></div>
-                        <h3 class="font-black text-lg text-slate-800 tracking-widest">${pName}</h3>
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mb-6">
+                    <div class="px-5 py-3 border-b border-slate-100 flex items-center gap-3" style="background-color: ${pColor}10;">
+                        <div class="w-3 h-3 rounded-full shadow-sm" style="background-color: ${pColor}"></div>
+                        <h3 class="font-bold text-sm text-slate-800 tracking-widest">${pName}</h3>
                     </div>
-                    <div class="p-6">
-                        <div class="relative border-l-2 border-slate-200 ml-3 space-y-6">
+                    <div class="px-5 py-2">
+                        <table class="w-full text-xs text-left border-collapse">
+                            <tbody>
                             ${logs.map(log => `
-                                <div class="relative pl-6">
-                                    <div class="absolute -left-[5px] top-1.5 w-2 h-2 rounded-full bg-amber-400 ring-4 ring-white"></div>
-                                    <div class="flex items-center gap-3 mb-2">
-                                        <div class="text-[11px] font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded shadow-sm">${dateUtils.formatDateTime(log.dateObj)}</div>
-                                        <div class="text-xs font-bold text-slate-600 flex items-center gap-2">
-                                            <span class="bg-cyan-50 text-cyan-700 px-2 py-0.5 rounded border border-cyan-100">${log.taskTitle}</span>
-                                            ${log.subtaskTitle ? `<i class="fa-solid fa-angle-right text-slate-300"></i><span class="bg-fuchsia-50 text-fuchsia-700 px-2 py-0.5 rounded border border-fuchsia-100">${log.subtaskTitle}</span>` : ''}
-                                        </div>
-                                    </div>
-                                    <div class="bg-slate-50 border border-slate-100 p-4 rounded-xl text-sm text-slate-700 whitespace-pre-wrap leading-relaxed shadow-sm hover:border-amber-300 hover:bg-amber-50/50 transition-all cursor-pointer group" onclick="openTaskModal('${log.taskId}')">
-                                        <div class="flex justify-between items-start">
-                                            <div>${log.content}</div>
-                                            <i class="fa-solid fa-arrow-up-right-from-square text-amber-500 opacity-0 group-hover:opacity-100 transition-opacity"></i>
-                                        </div>
-                                    </div>
-                                </div>
+                                <tr class="border-b border-slate-50 hover:bg-amber-50/50 transition-colors group cursor-pointer" onclick="openTaskModal('${log.taskId}')">
+                                    <td class="w-28 py-2 px-2 align-top text-[10px] text-slate-400 font-bold whitespace-nowrap">
+                                        ${dateUtils.formatDateTime(log.dateObj)}
+                                    </td>
+                                    <td class="w-48 py-2 px-2 align-top font-bold text-slate-600">
+                                        ${log.taskTitle}${log.subtaskTitle ? `<span class="text-slate-300 mx-1">&gt;</span>${log.subtaskTitle}` : ''}
+                                    </td>
+                                    <td class="py-2 px-2 align-top text-slate-700 whitespace-pre-wrap leading-tight break-words">
+                                        ${log.content}
+                                    </td>
+                                    <td class="w-6 py-2 align-top text-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <i class="fa-solid fa-arrow-up-right-from-square text-amber-500"></i>
+                                    </td>
+                                </tr>
                             `).join('')}
-                        </div>
+                            </tbody>
+                        </table>
                     </div>
-                </div>
-                `;
+                </div>`;
             });
 
-            
-            container.innerHTML = html;
+            if(!html) {
+                html = `<div class="text-center text-slate-400 font-bold mt-20"><i class="fa-solid fa-folder-open text-4xl mb-4 opacity-50 block"></i>メモはありません</div>`;
+            }
 
+            container.innerHTML = html;
         }
 
         
