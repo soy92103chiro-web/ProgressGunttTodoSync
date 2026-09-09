@@ -1487,6 +1487,7 @@
             state.tasks.forEach(t => {
                 if (currentFilter !== 'all' && t.projectId !== currentFilter) return;
                 const proj = state.projects.find(p => p.id === t.projectId) || { name: '不明', color: '#999' };
+                if (currentFilter === 'all' && (proj.name.includes('臨時') || proj.name.includes('事務'))) return;
 
                 if (t.memoLogs) {
                     t.memoLogs.forEach(log => {
