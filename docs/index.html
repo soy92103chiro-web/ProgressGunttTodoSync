@@ -1484,11 +1484,13 @@
 
             const tabsContainer = document.getElementById('dashboard-tabs-container');
             if (tabsContainer) {
-                let tabsHtml = `<button onclick="document.getElementById('dashboard-project-filter').value='all'; renderDashboard()" class="shrink-0 px-4 py-1.5 text-sm font-bold rounded-xl transition-colors ${currentFilter === 'all' ? 'bg-amber-100 text-amber-700 border-2 border-amber-300' : 'bg-slate-50 text-slate-500 hover:bg-slate-200 border-2 border-slate-100'}">すべての案件</button>`;
+                let tabsHtml = '';
                 
                 tabProjects.forEach(p => {
                     tabsHtml += `<button onclick="document.getElementById('dashboard-project-filter').value='${p.id}'; renderDashboard()" class="shrink-0 px-4 py-1.5 text-sm font-bold rounded-xl transition-colors ${currentFilter === p.id ? 'bg-amber-100 text-amber-700 border-2 border-amber-300' : 'bg-slate-50 text-slate-500 hover:bg-slate-200 border-2 border-slate-100'}">${p.name}</button>`;
                 });
+                
+                tabsHtml += `<button onclick="document.getElementById('dashboard-project-filter').value='all'; renderDashboard()" class="shrink-0 px-4 py-1.5 text-sm font-bold rounded-xl transition-colors ${currentFilter === 'all' ? 'bg-amber-100 text-amber-700 border-2 border-amber-300' : 'bg-slate-50 text-slate-500 hover:bg-slate-200 border-2 border-slate-100'}">すべての案件</button>`;
                 tabsContainer.innerHTML = tabsHtml;
             }
 
@@ -3763,7 +3765,7 @@
             // Auth
             loginWithEmail, registerWithEmail, loginWithGoogle, logoutUser,
             // UI View & Filters
-            switchView, updateProjectFilters, changeWeek, resetToCurrentWeek, toggleAccordion,
+            switchView, updateProjectFilters, renderDashboard, changeWeek, resetToCurrentWeek, toggleAccordion,
             // Weekly View
             renderWeekly, dragStartWeeklyPool, dragStartWeeklyTimeline, allowWeeklyDropContainer,
             dragWeeklyLeaveContainer, dropWeeklyContainer, unassignBlock, dropToPool,

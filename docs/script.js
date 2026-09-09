@@ -2782,7 +2782,7 @@
             // Auth
             loginWithEmail, registerWithEmail, loginWithGoogle, logoutUser,
             // UI View & Filters
-            switchView, updateProjectFilters, changeWeek, resetToCurrentWeek, toggleAccordion,
+            switchView, updateProjectFilters, renderDashboard, changeWeek, resetToCurrentWeek, toggleAccordion,
             // Weekly View
             renderWeekly, dragStartWeeklyPool, dragStartWeeklyTimeline, allowWeeklyDropContainer,
             dragWeeklyLeaveContainer, dropWeeklyContainer, unassignBlock, dropToPool,
