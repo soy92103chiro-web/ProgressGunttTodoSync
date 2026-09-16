@@ -2369,6 +2369,52 @@ function renderWeekly() {
         }
 
         
+        
+        function generateKanbanTaskHTML(task) {
+            const isDone = task.status === 'done';
+            const checkIcon = isDone ? 'fa-solid fa-circle-check text-fuchsia-500' : 'fa-regular fa-circle text-slate-300';
+            const titleClass = isDone ? 'line-through text-slate-400 font-bold' : 'font-black text-slate-700 group-hover:text-cyan-600 transition-colors';
+            const isSelected = state.selectedTasks.has(task.id);
+            const borderClass = isSelected ? 'neon-border-blue bg-blue-50/30' : 'cyber-panel bg-white';
+
+            let subHtml = '';
+            if (task.subtasks && task.subtasks.length > 0) {
+                const comp = task.subtasks.filter(s => s.completed).length;
+                const total = task.subtasks.length;
+                const pct = Math.round((comp / total) * 100);
+                subHtml = `
+                    <div class="mt-3">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-[10px] font-bold text-slate-400 font-mono"><i class="fa-solid fa-list-check mr-1"></i>${comp}/${total}</span>
+                            <span class="text-[9px] font-black ${pct === 100 ? 'text-fuchsia-500' : 'text-cyan-500'} font-mono">${pct}%</span>
+                        </div>
+                        <div class="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                            <div class="h-full ${pct === 100 ? 'bg-fuchsia-400' : 'bg-cyan-400'} transition-all duration-500" style="width: ${pct}%"></div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            let dueHtml = '';
+            if (task.dueDate) {
+                const isOverdue = new Date(task.dueDate) < new Date() && !isDone;
+                dueHtml = `<div class="text-[10px] font-bold ${isOverdue ? 'text-red-500 bg-red-50' : 'text-slate-400 bg-slate-50'} inline-flex items-center px-2 py-0.5 rounded-md border border-slate-100 font-mono mt-2"><i class="fa-regular fa-calendar mr-1"></i>${task.dueDate.substring(5)}</div>`;
+            }
+
+            return `
+                <div class="rounded-xl p-4 cursor-grab hover:scale-[1.02] transition-transform group relative ${borderClass}" draggable="true" ondragstart="dragStart(event, '${task.id}')" onclick="if(event.ctrlKey || event.metaKey) toggleTaskSelection('${task.id}'); else openTaskModal('${task.id}');">
+                    <div class="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onclick="event.stopPropagation(); deleteCurrentTask('${task.id}')" class="text-slate-300 hover:text-red-500 transition-colors p-1"><i class="fa-solid fa-trash-can text-sm"></i></button>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <i class="${checkIcon} mt-1 text-sm"></i>
+                        <h4 class="text-sm leading-snug ${titleClass}">${task.title}</h4>
+                    </div>
+                    ${dueHtml}
+                    ${subHtml}
+                </div>
+            `;
+        }
         function renderKanban() {
             const board = document.getElementById('kanban-board');
             if (!board) return;
@@ -2471,6 +2517,7 @@ function renderWeekly() {
         function toggleGanttTask(taskId) { state.expandedGanttTasks.has(taskId) ? state.expandedGanttTasks.delete(taskId) : state.expandedGanttTasks.add(taskId); renderGantt(); }
 
         function generateGanttHTML(startDate, endDate, projects, tasksToRender, cellWidth = 48, headerWidth = 380) {
+            let html = '';
             const isPrint = document.body.classList.contains('print-gantt');
             const currentHeaderWidth = isPrint ? (headerWidth || 250) : headerWidth;
             const currentCellWidth = cellWidth;
@@ -2480,6 +2527,7 @@ function renderWeekly() {
             const today = new Date(); today.setHours(0,0,0,0);
 
             const dailyHours = new Array(totalDays).fill(0);
+            const isHolidayCache = {}; dates.forEach(d => { isHolidayCache[d.getTime()] = !isBusinessDay(d); });
             
             const groupedProjects = {};
             const ungroupedProjects = [];
