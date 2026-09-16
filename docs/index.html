@@ -388,7 +388,42 @@
     
 </main>
 
-    <div id="modal-overlay" class="fixed inset-0 bg-slate-200 bg-opacity-60 z-50 hidden flex items-center justify-center backdrop-blur-md transition-opacity">
+    
+<!-- GROUP MODAL -->
+<div id="group-modal" class="fixed inset-0 bg-slate-200 bg-opacity-60 z-[60] hidden flex items-center justify-center backdrop-blur-md transition-opacity">
+    <div class="bg-white border-2 border-slate-200 rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
+        <div class="p-6 border-b-2 border-slate-100 flex justify-between items-center bg-cyan-50 rounded-t-3xl">
+            <h2 class="text-xl font-black text-cyan-800 tracking-widest uppercase"><i class="fa-solid fa-layer-group mr-3 text-cyan-500"></i>案件グループ管理</h2>
+            <button onclick="closeGroupModal()" class="text-slate-400 hover:text-slate-700 text-2xl transition-colors"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="p-6 overflow-y-auto flex-1 bg-slate-50/50">
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 mb-6">
+                <h3 class="text-xs font-bold text-slate-500 mb-4 tracking-widest" id="group-form-title">新規グループ作成</h3>
+                <input type="hidden" id="group-id">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 mb-1">グループ名</label>
+                        <input type="text" id="group-name" class="w-full bg-slate-50 border-2 border-slate-200 rounded-lg py-2 px-3 text-sm focus:border-cyan-500 outline-none font-bold text-slate-700">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 mb-1">テーマカラー</label>
+                        <div class="flex items-center gap-2">
+                            <input type="color" id="group-color" class="w-10 h-10 rounded cursor-pointer border-2 border-slate-200" value="#06b6d4">
+                            <span class="text-xs text-slate-500">※グループ内の全案件に適用されます</span>
+                        </div>
+                    </div>
+                    <div class="flex gap-2 pt-2">
+                        <button onclick="saveGroup()" class="flex-1 btn-cyber-blue py-2 rounded-lg text-sm font-bold shadow-md">保存</button>
+                        <button onclick="document.getElementById('group-id').value=''; document.getElementById('group-name').value=''; document.getElementById('group-form-title').innerText='新規グループ作成';" class="px-4 bg-slate-100 text-slate-500 hover:bg-slate-200 py-2 rounded-lg text-sm font-bold shadow-sm">クリア</button>
+                    </div>
+                </div>
+            </div>
+            <h3 class="text-xs font-bold text-slate-500 mb-3 tracking-widest">登録済みグループ</h3>
+            <div id="group-list-container" class="space-y-2"></div>
+        </div>
+    </div>
+</div>
+<div id="modal-overlay" class="fixed inset-0 bg-slate-200 bg-opacity-60 z-50 hidden flex items-center justify-center backdrop-blur-md transition-opacity">
         
         <div id="project-select-modal" class="bg-white border-2 border-slate-200 rounded-3xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col hidden">
             <div class="px-8 py-6 border-b-2 border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-3xl">
@@ -497,6 +532,13 @@
                             <button onclick="deleteProjectTemplate()" class="text-slate-300 hover:text-red-500 transition-all" title="テンプレートを削除"><i class="fa-solid fa-trash-can text-lg"></i></button>
                         </div>
                     </div>
+                </div>
+                
+                <div class="mb-6">
+                    <label class="block text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-widest">所属グループ</label>
+                    <select id="project-group-select" class="w-full bg-slate-50 border-2 border-slate-200 rounded-lg py-2 px-4 focus:border-cyan-500 outline-none text-slate-700 font-bold">
+                        <option value="">（グループなし）</option>
+                    </select>
                 </div>
                 <div class="mb-10">
                     <label class="block text-[10px] font-bold text-cyan-600 mb-3 uppercase tracking-widest">案件名 <span class="text-fuchsia-500">*</span></label>
@@ -840,7 +882,7 @@
                 colorInput.classList.remove('opacity-50');
             }
         }
-        Object.assign(window, { renderProjectGroupSelect, handleProjectGroupChange });
+        Object.assign(window, { renderProjectGroupSelect });
         
 function renderProjectCards() {
             const term = document.getElementById('project-search-input').value.toLowerCase();
@@ -926,11 +968,15 @@ function renderProjectCards() {
             if(countSpan) countSpan.innerText = selectedCount === 0 || selectedCount === totalProjects ? 'すべて' : `${selectedCount}件`;
         }
 
-        function toggleProjectSelection(id) {
+        function toggleProjectSelection(id, forceState) {
             const selectedSet = projectSelectMode === 'gantt' ? state.ganttSelectedProjects : state.kanbanSelectedProjects;
-            if (selectedSet.has(id)) selectedSet.delete(id);
-            else selectedSet.add(id);
-            renderProjectCards();
+            if (forceState !== undefined) {
+                if (forceState) selectedSet.add(id);
+                else selectedSet.delete(id);
+            } else {
+                if (selectedSet.has(id)) selectedSet.delete(id);
+                else selectedSet.add(id);
+            }renderProjectCards();
             
             // Live update views
             if (projectSelectMode === 'gantt') {
@@ -2465,6 +2511,8 @@ function renderProjectCards() {
             if (isEditMode) {
                 const p = state.projects.find(x => x.id === editingProjectId);
                 document.getElementById('project-name-input').value = p.name;
+                renderProjectGroupSelect();
+                if(document.getElementById('project-group-select')) document.getElementById('project-group-select').value = p.groupId || '';
                 editingMilestones = JSON.parse(JSON.stringify(p.milestones || []));
                 
                 const isComp = p.status === 'completed';
@@ -2473,6 +2521,8 @@ function renderProjectCards() {
             } else {
                 editingProjectId = null;
                 document.getElementById('project-name-input').value = '';
+                renderProjectGroupSelect();
+                if(document.getElementById('project-group-select')) document.getElementById('project-group-select').value = '';
                 document.querySelector('input[name="proj_type"][value="blank"]').checked = true;
                 toggleProjTemplateSelect();
                 editingMilestones = JSON.parse(JSON.stringify(defaultMilestonesTemplate));
@@ -2842,6 +2892,7 @@ function renderProjectCards() {
 
         async function saveProject() {
             const name = document.getElementById('project-name-input').value.trim();
+            const groupId = document.getElementById('project-group-select')?.value || null;
             if (!name) { showDialog('エラー', '案件名を入力してください。', 'error'); return; }
             if (!validateDynamicMilestones()) return; 
             

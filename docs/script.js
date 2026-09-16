@@ -1036,7 +1036,8 @@ function renderProjectCards() {
             }
         }
 
-        function renderWeekly() {
+        function renderDashboard() {}
+function renderWeekly() {
             renderAdHocTemplates();
             const baseDate = new Date(state.weeklyBaseDate);
             const endDate = new Date(baseDate);
