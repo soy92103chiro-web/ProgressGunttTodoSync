@@ -94,11 +94,11 @@
             const container = document.getElementById('weekly-adhoc-pool');
             if (!container) return;
             container.innerHTML = state.adHocTemplates.map(tmpl => `
-                <div class="p-2.5 bg-white border-2 border-slate-100 rounded-xl shadow-sm text-xs font-bold cursor-grab active:cursor-grabbing hover:border-cyan-400 transition-all text-slate-700 flex items-center gap-2"
+                <div class="px-2 py-1.5 bg-white border border-slate-200 rounded-lg shadow-sm text-[11px] font-bold cursor-grab active:cursor-grabbing hover:border-cyan-400 hover:shadow-md transition-all text-slate-700 flex items-center gap-1.5"
                      draggable="true" ondragstart="dragStartWeeklyAdhoc(event, '${tmpl.name}', ${tmpl.duration}, ${tmpl.isFree})">
                     <i class="fa-solid ${tmpl.icon} text-cyan-500"></i>
                     <span>${tmpl.name}</span>
-                    <span class="text-[10px] text-slate-400">(${tmpl.duration*0.5}h)</span>
+                    <span class="text-[9px] text-slate-400">(${tmpl.duration*0.5}h)</span>
                 </div>
             `).join('');
         }
@@ -238,7 +238,7 @@
                 colorInput.classList.remove('opacity-50');
             }
         }
-        Object.assign(window, { renderProjectGroupSelect, handleProjectGroupChange });
+        Object.assign(window, { renderProjectGroupSelect });
         
 function renderProjectCards() {
             const term = document.getElementById('project-search-input').value.toLowerCase();
@@ -324,11 +324,15 @@ function renderProjectCards() {
             if(countSpan) countSpan.innerText = selectedCount === 0 || selectedCount === totalProjects ? 'すべて' : `${selectedCount}件`;
         }
 
-        function toggleProjectSelection(id) {
+        function toggleProjectSelection(id, forceState) {
             const selectedSet = projectSelectMode === 'gantt' ? state.ganttSelectedProjects : state.kanbanSelectedProjects;
-            if (selectedSet.has(id)) selectedSet.delete(id);
-            else selectedSet.add(id);
-            renderProjectCards();
+            if (forceState !== undefined) {
+                if (forceState) selectedSet.add(id);
+                else selectedSet.delete(id);
+            } else {
+                if (selectedSet.has(id)) selectedSet.delete(id);
+                else selectedSet.add(id);
+            }renderProjectCards();
             
             // Live update views
             if (projectSelectMode === 'gantt') {
@@ -438,9 +442,10 @@ function renderProjectCards() {
             updateProjectTemplatesDropdown();
             updateTaskTemplatesDropdown();
             
-            if (state.currentView === 'kanban') renderKanban(); 
+            if (state.currentView === 'kanban') renderKanban();
             else if (state.currentView === 'gantt') renderGantt();
             else if (state.currentView === 'weekly') renderWeekly();
+            else if (state.currentView === 'dashboard') renderDashboard();
         }
 
         const defaultMilestonesTemplate = [
@@ -552,7 +557,23 @@ function renderProjectCards() {
                 if (snapshot.empty) {
                     for (let t of initialSeedData.tasks) await saveDoc('tasks', t.id, t);
                 } else {
-                    state.tasks = snapshot.docs.map(doc => doc.data());
+                    state.tasks = snapshot.docs.map(doc => {
+                        let t = doc.data();
+                        if (typeof t.notes === 'string' && t.notes.trim() !== '') {
+                            t.memoLogs = t.memoLogs || [];
+                            t.memoLogs.push({ id: generateId(), timestamp: t.dueDate ? new Date(t.dueDate).toISOString() : new Date().toISOString(), content: t.notes });
+                            t.notes = '';
+                        }
+                        t.subtasks = t.subtasks || [];
+                        t.subtasks.forEach(st => {
+                            if (typeof st.notes === 'string' && st.notes.trim() !== '') {
+                                st.memoLogs = st.memoLogs || [];
+                                st.memoLogs.push({ id: generateId(), timestamp: t.dueDate ? new Date(t.dueDate).toISOString() : new Date().toISOString(), content: st.notes });
+                                st.notes = '';
+                            }
+                        });
+                        return t;
+                    });
                     refreshCurrentView();
                 }
             }, (error) => console.error("Tasks Error:", error)));
@@ -867,6 +888,11 @@ function renderProjectCards() {
                 const diff = d.getDate() - day + (day === 0 ? -6 : 1);
                 return new Date(d.setDate(diff));
             },
+            formatDateTime: (d) => {
+                const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
+                const h = String(d.getHours()).padStart(2,'0'), min = String(d.getMinutes()).padStart(2,'0');
+                return `${y}/${m}/${day} ${h}:${min}`;
+            },
             formatDate: (date) => {
                 return date.getFullYear() + '-' + String(date.getMonth()+1).padStart(2,'0') + '-' + String(date.getDate()).padStart(2,'0');
             },
@@ -941,7 +967,262 @@ function renderProjectCards() {
             return due < today;
         }
 
-        function switchView(view) {
+        
+        let activeDashboardTaskId = null;
+
+        function openRegularMeetingModal() {
+            showModal('regular-meeting-modal');
+        }
+
+        async function saveRegularMeetings() {
+            const name = document.getElementById('rm-name').value || '定例会';
+            const dayOfWeek = parseInt(document.getElementById('rm-day').value);
+            const startTime = document.getElementById('rm-start-time').value || '10:00';
+            const durationH = parseFloat(document.getElementById('rm-duration').value) || 1;
+            const repeatWeeks = parseInt(document.getElementById('rm-weeks').value) || 4;
+
+            const [hh, mm] = startTime.split(':').map(Number);
+            let rawSlot = (hh - 9) * 2 + (mm >= 30 ? 1 : 0);
+            if (rawSlot < 0) rawSlot = 0;
+            if (rawSlot > 17) rawSlot = 17;
+            const startSlot = rawSlot;
+            const durationSlots = Math.round(durationH * 2);
+
+            let adhocP = state.projects.find(p => p.id === 'adhoc-project');
+            if (!adhocP) {
+                adhocP = { id: 'adhoc-project', name: '臨時・事務', color: '#9ca3af', milestones: [] };
+                await saveDoc('projects', 'adhoc-project', adhocP);
+            }
+
+            const baseDate = new Date(state.weeklyBaseDate || new Date());
+            baseDate.setHours(0,0,0,0);
+            
+            let targetDate = new Date(baseDate);
+            while (targetDate.getDay() !== dayOfWeek) {
+                targetDate.setDate(targetDate.getDate() + 1);
+            }
+
+            const taskId = generateId();
+            const subtasks = [];
+            
+            const firstDateStr = dateUtils.formatDate(targetDate);
+            let lastDateStr = firstDateStr;
+
+            for (let i = 0; i < repeatWeeks; i++) {
+                const dateStr = dateUtils.formatDate(targetDate);
+                lastDateStr = dateStr;
+                const subtaskId = generateId();
+                subtasks.push({
+                    id: subtaskId,
+                    title: `${dateStr.substring(5).replace('-','/')} ${name}`,
+                    hours: durationH,
+                    progress: 0,
+                    completed: false,
+                    assignments: [{
+                        id: generateId(),
+                        date: dateStr,
+                        startSlot: startSlot,
+                        duration: durationSlots
+                    }],
+                    note: ''
+                });
+                targetDate.setDate(targetDate.getDate() + 7);
+            }
+
+            const task = {
+                id: taskId,
+                projectId: 'adhoc-project',
+                title: `[定例] ${name}`,
+                status: 'todo',
+                startDate: firstDateStr,
+                dueDate: lastDateStr,
+                totalHours: durationH * subtasks.length,
+                notes: `${repeatWeeks}週分の定例会`,
+                subtasks: subtasks
+            };
+
+            state.tasks.push(task);
+            await saveDoc('tasks', task.id, task);
+
+            closeModal('regular-meeting-modal');
+            refreshCurrentView();
+        }
+
+        function renderDashboard() {
+            const container = document.getElementById('dashboard-timeline-container');
+            if (!container) return;
+
+            const filterInput = document.getElementById('dashboard-project-filter');
+            let currentFilter = filterInput ? filterInput.value : 'all';
+
+            const tabProjects = state.projects.filter(p => !p.name.includes('臨時') && !p.name.includes('事務'));
+            
+            // Validate filter
+            if (currentFilter !== 'all' && !tabProjects.find(p => p.id === currentFilter) && !state.projectGroups.find(g => g.id === currentFilter)) {
+                currentFilter = 'all';
+                if (filterInput) filterInput.value = 'all';
+            }
+
+            const tabsContainer = document.getElementById('dashboard-tabs-container');
+            if (tabsContainer) {
+                let tabsHtml = '';
+                
+                // All projects button
+                tabsHtml += `<button onclick="document.getElementById('dashboard-project-filter').value='all'; renderDashboard()" class="w-full text-left px-4 py-3 text-sm font-bold rounded-xl transition-all mb-2 flex items-center gap-3 ${currentFilter === 'all' ? 'bg-amber-100 text-amber-700 shadow-sm border border-amber-200' : 'text-slate-500 hover:bg-slate-100 border border-transparent'}"><i class="fa-solid fa-earth-americas text-lg"></i> すべての案件</button>`;
+
+                // Groups
+                state.projectGroups.forEach(group => {
+                    tabsHtml += `<div class="mb-4">`;
+                    tabsHtml += `<button onclick="document.getElementById('dashboard-project-filter').value='${group.id}'; renderDashboard()" class="w-full text-left px-3 py-2 text-sm font-black rounded-lg transition-all flex items-center gap-2 ${currentFilter === group.id ? 'bg-amber-100 text-amber-700 shadow-sm border border-amber-200' : 'text-slate-700 hover:bg-slate-100 border border-transparent'}">`;
+                    tabsHtml += `<div class="w-3 h-3 rounded-md shadow-sm shrink-0" style="background-color: ${group.color}"></div> ${group.name}`;
+                    tabsHtml += `</button>`;
+                    
+                    const groupProjects = tabProjects.filter(p => p.groupId === group.id);
+                    if (groupProjects.length > 0) {
+                        tabsHtml += `<div class="pl-4 mt-1 border-l-2 border-slate-100 ml-4 space-y-1">`;
+                        groupProjects.forEach(p => {
+                            tabsHtml += `<button onclick="document.getElementById('dashboard-project-filter').value='${p.id}'; renderDashboard()" class="w-full text-left px-3 py-1.5 text-xs font-bold rounded-lg transition-all truncate ${currentFilter === p.id ? 'bg-cyan-50 text-cyan-700' : 'text-slate-500 hover:bg-slate-100'}">${p.name}</button>`;
+                        });
+                        tabsHtml += `</div>`;
+                    }
+                    tabsHtml += `</div>`;
+                });
+
+                // Ungrouped
+                const ungroupedProjects = tabProjects.filter(p => !p.groupId);
+                if (ungroupedProjects.length > 0) {
+                    tabsHtml += `<div class="mb-4">`;
+                    tabsHtml += `<div class="px-3 py-2 text-xs font-bold text-slate-400 tracking-widest uppercase">グループなし</div>`;
+                    tabsHtml += `<div class="space-y-1">`;
+                    ungroupedProjects.forEach(p => {
+                        tabsHtml += `<button onclick="document.getElementById('dashboard-project-filter').value='${p.id}'; renderDashboard()" class="w-full text-left px-3 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-2 truncate ${currentFilter === p.id ? 'bg-cyan-50 text-cyan-700' : 'text-slate-500 hover:bg-slate-100'}">`;
+                        tabsHtml += `<div class="w-2 h-2 rounded-full shadow-sm shrink-0" style="background-color: ${p.color}"></div> ${p.name}`;
+                        tabsHtml += `</button>`;
+                    });
+                    tabsHtml += `</div></div>`;
+                }
+                
+                tabsContainer.innerHTML = tabsHtml;
+            }
+
+            let allLogs = [];
+            state.tasks.forEach(t => {
+                const proj = state.projects.find(p => p.id === t.projectId) || { name: '不明', color: '#999', groupId: null };
+                
+                // Filtering logic
+                if (currentFilter !== 'all') {
+                    // Check if filter is a Group ID or Project ID
+                    const isGroupFilter = state.projectGroups.find(g => g.id === currentFilter);
+                    if (isGroupFilter) {
+                        if (proj.groupId !== currentFilter) return; // exclude if not in this group
+                    } else {
+                        if (t.projectId !== currentFilter) return; // exclude if not this project
+                    }
+                }
+                
+                if (currentFilter === 'all' && (proj.name.includes('臨時') || proj.name.includes('事務'))) return;
+
+                if (t.memoLogs) {
+                    t.memoLogs.forEach(log => {
+                        allLogs.push({ ...log, projectId: t.projectId, projectName: proj.name, projectColor: proj.color, taskId: t.id, taskTitle: t.title, subtaskTitle: null, dateObj: new Date(log.timestamp) });
+                    });
+                }
+
+                t.subtasks.forEach(st => {
+                    if (st.memoLogs) {
+                        st.memoLogs.forEach(log => {
+                            allLogs.push({ ...log, projectId: t.projectId, projectName: proj.name, projectColor: proj.color, taskId: t.id, taskTitle: t.title, subtaskId: st.id, subtaskTitle: st.title, dateObj: new Date(log.timestamp) });
+                        });
+                    }
+                });
+            });
+
+            // Sort newest first
+            allLogs.sort((a, b) => b.dateObj - a.dateObj);
+
+            // Group by Date String
+            const logsByDate = {};
+            allLogs.forEach(log => {
+                const dStr = log.dateObj.toLocaleDateString('ja-JP', { year: 'numeric', month: 'short', day: 'numeric', weekday: 'short' });
+                if (!logsByDate[dStr]) logsByDate[dStr] = [];
+                logsByDate[dStr].push(log);
+            });
+
+            let html = '<div class="space-y-12 max-w-4xl mx-auto">';
+            const dateKeys = Object.keys(logsByDate);
+
+            if (dateKeys.length === 0) {
+                html = `<div class="text-center text-slate-400 font-bold mt-32"><i class="fa-solid fa-folder-open text-5xl mb-6 opacity-30 block"></i>メモはありません</div>`;
+            } else {
+                dateKeys.forEach(dStr => {
+                    const logs = logsByDate[dStr];
+                    html += `
+                    <div class="relative">
+                        <!-- Date Header -->
+                        <div class="sticky top-0 z-10 flex items-center gap-4 mb-8 bg-slate-50/95 py-3 backdrop-blur-md rounded-lg px-2">
+                            <div class="bg-slate-700 text-white font-black text-sm px-6 py-2.5 rounded-full shadow-md tracking-widest">${dStr}</div>
+                            <div class="h-0.5 bg-slate-300 flex-1 rounded-full opacity-50"></div>
+                        </div>
+                        
+                        <!-- Timeline Items -->
+                        <div class="space-y-8 pl-4 border-l-4 border-slate-300 ml-8 relative pb-2">
+                            ${logs.map(log => `
+                                <div class="relative pl-8 group cursor-pointer" onclick="openTaskModal('${log.taskId}')">
+                                    <!-- Timeline Node -->
+                                    <div class="absolute -left-[12px] top-4 w-5 h-5 rounded-full shadow-sm ring-4 ring-slate-50 group-hover:scale-125 transition-transform" style="background-color: ${log.projectColor}"></div>
+                                    
+                                    <!-- Content Card -->
+                                    <div class="bg-white border-2 border-slate-200 rounded-2xl p-5 shadow-sm hover:border-cyan-400 hover:shadow-md transition-all relative">
+                                        <div class="flex flex-wrap items-center gap-2 mb-3">
+                                            <div class="text-xs font-black text-slate-400 bg-slate-100 px-2 py-1 rounded shadow-inner">${log.dateObj.toLocaleTimeString('ja-JP', {hour: '2-digit', minute:'2-digit'})}</div>
+                                            ${currentFilter !== log.projectId ? `<div class="text-[10px] font-bold text-white px-2 py-1 rounded shadow-sm tracking-widest" style="background-color: ${log.projectColor}">${log.projectName}</div>` : ''}
+                                            <div class="text-xs font-bold text-slate-600 bg-slate-50 px-2 py-1 rounded border border-slate-200 flex items-center gap-2">
+                                                <span>${log.taskTitle}</span>
+                                                ${log.subtaskTitle ? `<i class="fa-solid fa-caret-right text-slate-300"></i><span class="text-slate-500">${log.subtaskTitle}</span>` : ''}
+                                            </div>
+                                        </div>
+                                        <div class="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap font-medium">${log.content}</div>
+                                        
+                                        <!-- Hover Icon -->
+                                        <div class="absolute right-4 top-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <i class="fa-solid fa-arrow-up-right-from-square text-cyan-500 text-lg"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>`;
+                });
+                html += '</div>';
+            }
+
+            container.innerHTML = html;
+        }
+
+        
+
+        async function saveDashboardMemo() {
+            if (!activeDashboardTaskId) return;
+            const input = document.getElementById('dashboard-memo-input').value;
+            const task = state.tasks.find(t => t.id === activeDashboardTaskId);
+            if (task) {
+                task.notes = input;
+                await saveDoc('tasks', task.id, task);
+                const btn = document.getElementById('dashboard-memo-save');
+                const orig = btn.innerHTML;
+                btn.innerHTML = '<i class="fa-solid fa-check mr-2"></i>保存しました';
+                btn.classList.add('bg-emerald-500', 'hover:bg-emerald-600');
+                btn.classList.remove('bg-amber-500', 'hover:bg-amber-600');
+                setTimeout(() => {
+                    btn.innerHTML = orig;
+                    btn.classList.remove('bg-emerald-500', 'hover:bg-emerald-600');
+                    btn.classList.add('bg-amber-500', 'hover:bg-amber-600');
+                }, 2000);
+            }
+        }
+
+        function switchView
+(view) {
             if (view === 'weekly' && state.currentView !== 'weekly') {
                 showDialog(
                     '確認', 
@@ -958,15 +1239,19 @@ function renderProjectCards() {
         function executeSwitchView(view) {
             state.currentView = view;
             
-            ['kanban', 'gantt', 'weekly'].forEach(v => {
+            ['kanban', 'gantt', 'weekly', 'dashboard'].forEach(v => {
                 const tab = document.getElementById(`tab-${v}`);
-                const viewEl = document.getElementById(`view-${v}`);
-                if (v === view) {
-                    tab.className = "px-6 py-2.5 rounded-lg text-sm font-bold uppercase tracking-widest transition-all bg-cyan-600 text-white shadow-md border-2 border-cyan-500/20";
-                    viewEl.classList.remove('hidden');
-                } else {
-                    tab.className = "px-6 py-2.5 rounded-lg text-sm font-bold uppercase tracking-widest transition-all text-slate-400 hover:text-cyan-600 hover:bg-white";
-                    viewEl.classList.add('hidden');
+                if (tab) {
+                    if (v === view) {
+                        tab.className = "px-6 py-2.5 rounded-lg text-sm font-bold uppercase tracking-widest transition-all bg-cyan-600 text-white shadow-md border-2 border-cyan-500";
+                    } else {
+                        tab.className = "px-6 py-2.5 rounded-lg text-sm font-bold uppercase tracking-widest transition-all text-slate-400 hover:text-cyan-600 hover:bg-white";
+                    }
+                }
+                const vDiv = document.getElementById(`view-${v}`);
+                if (vDiv) {
+                    if (v === view) vDiv.classList.remove('hidden');
+                    else vDiv.classList.add('hidden');
                 }
             });
             refreshCurrentView();
@@ -986,6 +1271,7 @@ function renderProjectCards() {
                 });
 
                 sorted.forEach(p => {
+                    if (p.name.includes('臨時') || p.name.includes('事務')) return;
                     const isCompleted = isProjectCompleted(p.id);
                     if (!isCompleted || state.showCompletedProjects || currentValue === p.id) {
                         html += `<option value="${p.id}" ${currentValue === p.id ? 'selected' : ''} class="${isCompleted ? 'text-slate-500' : ''}">${p.name}${isCompleted ? ' (完了)' : ''}</option>`;
@@ -1036,8 +1322,7 @@ function renderProjectCards() {
             }
         }
 
-        function renderDashboard() {}
-function renderWeekly() {
+        function renderWeekly() {
             renderAdHocTemplates();
             const baseDate = new Date(state.weeklyBaseDate);
             const endDate = new Date(baseDate);
@@ -1149,6 +1434,7 @@ function renderWeekly() {
 
                     let assignBadge = '';
                     const isFull = assignedH > 0 && assignedH >= remH;
+                    if (task.projectId === 'adhoc-project' && isFull) return;
                     if (assignedH > 0) {
                         const pct = remH > 0 ? Math.round(Math.min(100, (assignedH / remH) * 100)) : 100;
                         const colorClass = isFull ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-cyan-50 text-cyan-700 border-cyan-200';
@@ -1224,6 +1510,8 @@ function renderWeekly() {
             for (let i = 0; i < 7; i++) {
                 const targetDate = new Date(baseDate);
                 targetDate.setDate(targetDate.getDate() + i);
+                const dayOfWeek = targetDate.getDay();
+                if (dayOfWeek === 0 || dayOfWeek === 6) continue;
                 const dateStr = dateUtils.formatDate(targetDate);
                 const dayStr = dateUtils.getJapaneseDay(targetDate);
                 const isHol = !isBusinessDay(targetDate);
@@ -1248,7 +1536,8 @@ function renderWeekly() {
                                 blocksHtml += `
                                     <div class="absolute left-14 right-2 rounded-lg border-2 shadow-md group overflow-hidden cursor-grab active:cursor-grabbing hover:scale-[1.02] transition-all z-10"
                                          style="top: calc(${a.startSlot} * var(--slot-height)); height: calc(${a.duration} * var(--slot-height)); background-color: ${pColor}10; border-color: ${borderCol}60; box-shadow: 0 4px 10px rgba(0,0,0,0.05);"
-                                         draggable="true" ondragstart="dragStartWeeklyTimeline(event, '${t.id}', '${st.id}', '${a.date}', ${a.startSlot}, ${a.duration})">
+                                         draggable="true" ondragstart="dragStartWeeklyTimeline(event, '${t.id}', '${st.id}', '${a.date}', ${a.startSlot}, ${a.duration})"
+                                         ondblclick="openTaskModal('${t.id}')">
                                         <div class="absolute left-0 top-0 bottom-0 w-1.5" style="background-color: ${pColor}; shadow: 2px 0 5px rgba(0,0,0,0.1);"></div>
                                         <div class="pl-4 pt-1.5 pr-8 text-slate-800 leading-tight w-full h-full overflow-hidden font-mono font-bold">
                                             <div class="truncate text-[10px] ${overdue ? 'text-fuchsia-600 font-black' : 'text-slate-400 font-black'} uppercase tracking-tighter">${t.title}</div>
@@ -1578,6 +1867,8 @@ function renderWeekly() {
             if (isEditMode) {
                 const p = state.projects.find(x => x.id === editingProjectId);
                 document.getElementById('project-name-input').value = p.name;
+                renderProjectGroupSelect();
+                if(document.getElementById('project-group-select')) document.getElementById('project-group-select').value = p.groupId || '';
                 editingMilestones = JSON.parse(JSON.stringify(p.milestones || []));
                 
                 const isComp = p.status === 'completed';
@@ -1586,6 +1877,8 @@ function renderWeekly() {
             } else {
                 editingProjectId = null;
                 document.getElementById('project-name-input').value = '';
+                renderProjectGroupSelect();
+                if(document.getElementById('project-group-select')) document.getElementById('project-group-select').value = '';
                 document.querySelector('input[name="proj_type"][value="blank"]').checked = true;
                 toggleProjTemplateSelect();
                 editingMilestones = JSON.parse(JSON.stringify(defaultMilestonesTemplate));
@@ -1955,6 +2248,7 @@ function renderWeekly() {
 
         async function saveProject() {
             const name = document.getElementById('project-name-input').value.trim();
+            const groupId = document.getElementById('project-group-select')?.value || null;
             if (!name) { showDialog('エラー', '案件名を入力してください。', 'error'); return; }
             if (!validateDynamicMilestones()) return; 
             
@@ -2029,10 +2323,22 @@ function renderWeekly() {
 
             if (taskId) {
                 workingTask = JSON.parse(JSON.stringify(state.tasks.find(t => t.id === taskId)));
+                if (typeof workingTask.notes === 'string' && workingTask.notes.trim() !== '') {
+                    workingTask.memoLogs = [{ id: generateId(), timestamp: new Date().toISOString(), content: workingTask.notes }];
+                    workingTask.notes = '';
+                }
+                workingTask.memoLogs = workingTask.memoLogs || [];
+                workingTask.subtasks.forEach(st => {
+                    if (typeof st.notes === 'string' && st.notes.trim() !== '') {
+                        st.memoLogs = [{ id: generateId(), timestamp: new Date().toISOString(), content: st.notes }];
+                        st.notes = '';
+                    }
+                    st.memoLogs = st.memoLogs || [];
+                });
             } else {
                 const pId = document.getElementById('kanban-project-filter')?.value;
                 const targetPId = (pId && pId !== 'all') ? pId : state.projects[0].id;
-                workingTask = { id: generateId(), projectId: targetPId, title: '', status: 'todo', dueDate: '', startDate: '', totalHours: 0, notes: '', subtasks: [] };
+                workingTask = { id: generateId(), projectId: targetPId, title: '', status: 'todo', dueDate: '', startDate: '', totalHours: 0, memoLogs: [], subtasks: [] };
             }
             renderTaskModalContent();
             showModal('task-modal');
@@ -2243,8 +2549,20 @@ function renderWeekly() {
                                         <p class="text-[10px] text-slate-400 mt-3 leading-relaxed font-bold italic">※納期から工数を逆算し、他の案件負荷や休日を考慮して算出されます。</p>
                                     </div>
                                     <div class="pt-4 border-t-2 border-slate-50">
-                                        <label class="block text-xs font-black text-slate-500 mb-3">補足事項・メモ</label>
-                                        <textarea onchange="updateWorkingTask('notes', this.value)" rows="6" class="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 text-sm font-medium text-slate-600 focus:border-cyan-500 outline-none transition-all resize-none" placeholder="タスクに関する詳細な指示や連絡事項を入力...">${workingTask.notes || ''}</textarea>
+                                        <label class="block text-xs font-black text-slate-500 mb-3">補足事項・メモ履歴</label>
+                                        <div class="space-y-3 mb-4 max-h-60 overflow-y-auto custom-scrollbar pr-2">
+                                            ${(workingTask.memoLogs || []).map(log => `
+                                                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative group">
+                                                    <div class="text-[10px] text-slate-400 font-bold mb-2">${dateUtils.formatDateTime(new Date(log.timestamp))}</div>
+                                                    <div class="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">${log.content}</div>
+                                                    <button onclick="deleteTaskMemoLog('${log.id}')" class="absolute top-2 right-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><i class="fa-solid fa-trash-can text-sm"></i></button>
+                                                </div>
+                                            `).join('')}
+                                        </div>
+                                        <div class="flex items-start gap-3">
+                                            <textarea id="task-note-input" rows="3" class="w-full bg-slate-50 border-2 border-slate-200 rounded-2xl px-5 py-4 text-sm font-medium text-slate-600 focus:border-cyan-500 outline-none transition-all resize-none" placeholder="新しいメモを入力..."></textarea>
+                                            <button onclick="addTaskMemoLog()" class="bg-cyan-600 text-white px-6 py-4 rounded-2xl hover:bg-cyan-700 transition-all shadow-md text-sm font-bold whitespace-nowrap h-[88px] flex flex-col items-center justify-center"><i class="fa-solid fa-paper-plane mb-1"></i>追加</button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -2252,6 +2570,56 @@ function renderWeekly() {
                     </div>
                 </div>
             `;
+            
+            // Restore scroll
+            if (savedScrollTop) {
+                const newBody = document.getElementById('task-modal-body');
+                if (newBody) newBody.scrollTop = savedScrollTop;
+            }
+            if (savedScrollLeft) {
+                const newStContainer = document.getElementById('subtask-kanban-container');
+                if (newStContainer) newStContainer.scrollLeft = savedScrollLeft;
+            }
+        }
+
+        
+        function addTaskMemoLog() {
+            const input = document.getElementById('task-note-input');
+            const val = input.value.trim();
+            if (!val) return;
+            workingTask.memoLogs = workingTask.memoLogs || [];
+            workingTask.memoLogs.unshift({ id: generateId(), timestamp: new Date().toISOString(), content: val });
+            renderTaskModalContent();
+        }
+        function deleteTaskMemoLog(logId) {
+            if(!confirm('このメモを削除しますか？')) return;
+            workingTask.memoLogs = workingTask.memoLogs.filter(l => l.id !== logId);
+            renderTaskModalContent();
+        }
+        function addSubtaskMemoLog(stId) {
+            const st = workingTask.subtasks.find(s => s.id === stId);
+            if (!st) return;
+            const input = document.getElementById('st-note-input-' + stId);
+            const val = input.value.trim();
+            if (!val) return;
+            st.memoLogs = st.memoLogs || [];
+            st.memoLogs.unshift({ id: generateId(), timestamp: new Date().toISOString(), content: val });
+            st.showMemoInput = true;
+            renderTaskModalContent();
+        }
+        function deleteSubtaskMemoLog(stId, logId) {
+            if(!confirm('このメモを削除しますか？')) return;
+            const st = workingTask.subtasks.find(s => s.id === stId);
+            if (!st) return;
+            st.memoLogs = st.memoLogs.filter(l => l.id !== logId);
+            renderTaskModalContent();
+        }
+        function toggleSubtaskNoteAlt(noteId, iconId, stId) {
+            const st = workingTask.subtasks.find(s => s.id === stId);
+            if (st) {
+                st.showMemoInput = !st.showMemoInput;
+                renderTaskModalContent();
+            }
         }
 
         function updateWorkingTask(f, v) { workingTask[f] = v; if (f === 'dueDate') { recalculateDates(); renderTaskModalContent(); } }
@@ -2370,134 +2738,210 @@ function renderWeekly() {
 
         
         
-        function generateKanbanTaskHTML(task) {
-            const isDone = task.status === 'done';
-            const checkIcon = isDone ? 'fa-solid fa-circle-check text-fuchsia-500' : 'fa-regular fa-circle text-slate-300';
-            const titleClass = isDone ? 'line-through text-slate-400 font-bold' : 'font-black text-slate-700 group-hover:text-cyan-600 transition-colors';
-            const isSelected = state.selectedTasks.has(task.id);
-            const borderClass = isSelected ? 'neon-border-blue bg-blue-50/30' : 'cyber-panel bg-white';
-
-            let subHtml = '';
-            if (task.subtasks && task.subtasks.length > 0) {
-                const comp = task.subtasks.filter(s => s.completed).length;
-                const total = task.subtasks.length;
-                const pct = Math.round((comp / total) * 100);
-                subHtml = `
-                    <div class="mt-3">
-                        <div class="flex justify-between items-center mb-1">
-                            <span class="text-[10px] font-bold text-slate-400 font-mono"><i class="fa-solid fa-list-check mr-1"></i>${comp}/${total}</span>
-                            <span class="text-[9px] font-black ${pct === 100 ? 'text-fuchsia-500' : 'text-cyan-500'} font-mono">${pct}%</span>
-                        </div>
-                        <div class="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                            <div class="h-full ${pct === 100 ? 'bg-fuchsia-400' : 'bg-cyan-400'} transition-all duration-500" style="width: ${pct}%"></div>
-                        </div>
-                    </div>
-                `;
-            }
-            
-            let dueHtml = '';
-            if (task.dueDate) {
-                const isOverdue = new Date(task.dueDate) < new Date() && !isDone;
-                dueHtml = `<div class="text-[10px] font-bold ${isOverdue ? 'text-red-500 bg-red-50' : 'text-slate-400 bg-slate-50'} inline-flex items-center px-2 py-0.5 rounded-md border border-slate-100 font-mono mt-2"><i class="fa-regular fa-calendar mr-1"></i>${task.dueDate.substring(5)}</div>`;
-            }
-
-            return `
-                <div class="rounded-xl p-4 cursor-grab hover:scale-[1.02] transition-transform group relative ${borderClass}" draggable="true" ondragstart="dragStart(event, '${task.id}')" onclick="if(event.ctrlKey || event.metaKey) toggleTaskSelection('${task.id}'); else openTaskModal('${task.id}');">
-                    <div class="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onclick="event.stopPropagation(); deleteCurrentTask('${task.id}')" class="text-slate-300 hover:text-red-500 transition-colors p-1"><i class="fa-solid fa-trash-can text-sm"></i></button>
-                    </div>
-                    <div class="flex items-start gap-3">
-                        <i class="${checkIcon} mt-1 text-sm"></i>
-                        <h4 class="text-sm leading-snug ${titleClass}">${task.title}</h4>
-                    </div>
-                    ${dueHtml}
-                    ${subHtml}
-                </div>
-            `;
-        }
         function renderKanban() {
-            const board = document.getElementById('kanban-board');
-            if (!board) return;
+            const container = document.getElementById('kanban-board');
+            container.innerHTML = '';
             const hideDone = document.getElementById('kanban-hide-done')?.checked || false;
+            const pIdFilter = document.getElementById('kanban-project-filter')?.value || 'all';
 
-            let filteredProjects = state.projects;
-            if (!state.showCompletedProjects) filteredProjects = filteredProjects.filter(p => !isProjectCompleted(p.id));
-            if (state.kanbanSelectedProjects.size > 0) filteredProjects = filteredProjects.filter(p => state.kanbanSelectedProjects.has(p.id));
-
-            const activeTaskCount = (p) => state.tasks.filter(t => t.projectId === p.id && t.status !== 'done').length;
-            filteredProjects.sort((a, b) => {
-                const aCount = activeTaskCount(a);
-                const bCount = activeTaskCount(b);
-                if (aCount === 0 && bCount > 0) return 1;
-                if (aCount > 0 && bCount === 0) return -1;
-                return 0;
-            });
-
-            const groupedProjects = {};
-            const ungroupedProjects = [];
-            filteredProjects.forEach(p => {
-                if(p.groupId) {
-                    if(!groupedProjects[p.groupId]) groupedProjects[p.groupId] = [];
-                    groupedProjects[p.groupId].push(p);
-                } else {
-                    ungroupedProjects.push(p);
-                }
-            });
-
-            let html = '';
-
-            const renderProjectRow = (proj, isLastInGroup) => {
-                const tasks = state.tasks.filter(t => t.projectId === proj.id);
-                const isCompleted = isProjectCompleted(proj.id);
-                let rowHtml = '<div class="flex flex-col relative ' + (isLastInGroup ? '' : 'border-b border-slate-100') + '">';
-                rowHtml += '<div class="flex sticky left-0 z-10 bg-white items-center gap-3 p-4 border-r-2 border-slate-200" style="width: 280px; min-width: 280px;">';
-                rowHtml += '<div class="w-4 h-4 rounded-full shadow-sm shrink-0" style="background-color: ' + proj.color + '"></div>';
-                rowHtml += '<div class="font-black text-sm text-slate-700 truncate tracking-widest ' + (isCompleted ? 'line-through opacity-50' : '') + '">' + proj.name + '</div>';
-                rowHtml += '</div>';
-                
-                rowHtml += '<div class="flex-1 flex">';
-                ['todo', 'in_progress', 'done'].forEach(status => {
-                    const statusTasks = tasks.filter(t => t.status === status).sort((a,b)=>a.order-b.order);
-                    rowHtml += '<div class="flex-1 min-w-[320px] max-w-[450px] p-4 ' + (status !== 'done' ? 'border-r border-slate-100 border-dashed' : '') + ' bg-slate-50/30" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="dropTask(event, \'' + proj.id + '\', \'' + status + '\')" data-status="' + status + '" data-project="' + proj.id + '">';
-                    rowHtml += '<div class="space-y-3 min-h-[60px]">';
-                    statusTasks.forEach(task => { rowHtml += generateKanbanTaskHTML(task); });
-                    rowHtml += '</div></div>';
-                });
-                rowHtml += '</div></div>';
-                return rowHtml;
-            };
-
-            state.projectGroups.forEach(group => {
-                const groupProjects = groupedProjects[group.id];
-                if(groupProjects && groupProjects.length > 0) {
-                    html += '<div class="mb-8 bg-white rounded-2xl border-2 border-slate-200 shadow-sm overflow-hidden">';
-                    html += '<div class="px-5 py-3 border-b-2 border-slate-200 flex items-center gap-3 bg-slate-50">';
-                    html += '<div class="w-4 h-4 rounded-md shadow-sm" style="background-color: ' + group.color + '"></div>';
-                    html += '<h3 class="font-black text-slate-800 tracking-widest">' + group.name + '</h3>';
-                    html += '</div>';
-                    groupProjects.forEach((proj, idx) => { html += renderProjectRow(proj, idx === groupProjects.length - 1); });
-                    html += '</div>';
-                }
-            });
-
-            if (ungroupedProjects.length > 0) {
-                html += '<div class="mb-8 bg-white rounded-2xl border-2 border-slate-200 shadow-sm overflow-hidden">';
-                html += '<div class="px-5 py-2 border-b-2 border-slate-200 flex items-center gap-3 bg-slate-100">';
-                html += '<h3 class="font-bold text-xs text-slate-400 tracking-widest uppercase">グループなし</h3>';
-                html += '</div>';
-                ungroupedProjects.forEach((proj, idx) => { html += renderProjectRow(proj, idx === ungroupedProjects.length - 1); });
-                html += '</div>';
+            let filterTasks = state.tasks;
+            
+            if (!state.showCompletedProjects) {
+                filterTasks = filterTasks.filter(t => !isProjectCompleted(t.projectId));
             }
 
-            if(!html) html = '<div class="text-center text-slate-400 font-bold mt-20"><i class="fa-solid fa-folder-open text-4xl mb-4 opacity-50 block"></i>表示できる案件がありません</div>';
-            board.innerHTML = html;
-        }
+            if (pIdFilter !== 'all') {
+                filterTasks = filterTasks.filter(t => t.projectId === pIdFilter);
+            } else if (state.kanbanSelectedProjects.size > 0) {
+                filterTasks = filterTasks.filter(t => state.kanbanSelectedProjects.has(t.projectId));
+            } else {
+                // pId is 'all' and no projects selected manually. Hide 臨時 and 事務 by default.
+                filterTasks = filterTasks.filter(t => {
+                    const p = state.projects.find(proj => proj.id === t.projectId);
+                    if (!p) return true;
+                    return !p.name.includes('臨時') && !p.name.includes('事務');
+                });
+            }
 
+            const relevantProjectIds = new Set();
+            if (pIdFilter !== 'all') relevantProjectIds.add(pIdFilter);
+            else if (state.kanbanSelectedProjects.size > 0) {
+                state.kanbanSelectedProjects.forEach(id => relevantProjectIds.add(id));
+            } else {
+                state.projects.forEach(p => {
+                    if (!p.name.includes('臨時') && !p.name.includes('事務')) {
+                        relevantProjectIds.add(p.id);
+                    }
+                });
+            }
+            if (filterTasks.some(t => !t.projectId)) relevantProjectIds.add(null);
+
+            const swimlaneProjects = [];
+            relevantProjectIds.forEach(id => {
+                if (id) {
+                    const p = state.projects.find(proj => proj.id === id);
+                    if (p && (state.showCompletedProjects || !isProjectCompleted(p.id))) swimlaneProjects.push(p);
+                }
+            });
+            
+                        swimlaneProjects.sort((a, b) => {
+                const groupA = state.projectGroups.find(g => g.id === a.groupId);
+                const groupB = state.projectGroups.find(g => g.id === b.groupId);
+                const orderA = groupA ? (groupA.order || 0) : 9999;
+                const orderB = groupB ? (groupB.order || 0) : 9999;
+                if (orderA !== orderB) return orderA - orderB;
+                
+                const compA = isProjectCompleted(a.id);
+                const compB = isProjectCompleted(b.id);
+                if (compA !== compB) return compA ? 1 : -1;
+                
+                const activeA = filterTasks.some(t => (t.projectId || null) === a.id && (t.status === 'todo' || t.status === 'in_progress'));
+                const activeB = filterTasks.some(t => (t.projectId || null) === b.id && (t.status === 'todo' || t.status === 'in_progress'));
+                if (activeA !== activeB) return activeA ? -1 : 1;
+                
+                return a.name.localeCompare(b.name);
+            });
+
+            if (relevantProjectIds.has(null)) {
+                swimlaneProjects.push({ id: null, name: '所属なし', color: '#9ca3af' });
+            }
+
+            const columns = [
+                { id: 'todo', title: '未着手', icon: 'fa-list-ul', color: 'slate' },
+                { id: 'in_progress', title: '進行中', icon: 'fa-spinner', color: 'cyan' },
+                { id: 'done', title: '完了', icon: 'fa-check-circle', color: 'fuchsia' }
+            ];
+
+            let currentGroupId = 'INITIAL';
+            swimlaneProjects.forEach(project => {
+                if (project.groupId !== currentGroupId) {
+                    currentGroupId = project.groupId;
+                    const group = state.projectGroups.find(g => g.id === project.groupId);
+                    if (group) {
+                        const gHeader = document.createElement('div');
+                        gHeader.className = 'w-full py-2 px-4 mb-4 bg-slate-200 text-slate-700 font-bold text-sm rounded-lg flex items-center gap-2 border-2 border-slate-300 shadow-sm';
+                        gHeader.innerHTML = `<div class="w-3 h-3 rounded shadow-sm" style="background-color: ${group.color}"></div> ${group.name}`;
+                        container.appendChild(gHeader);
+                    } else if (project.groupId === undefined || project.groupId === null) {
+                        const gHeader = document.createElement('div');
+                        gHeader.className = 'w-full py-2 px-4 mb-4 bg-slate-100 text-slate-500 font-bold text-sm rounded-lg flex items-center gap-2 border-2 border-slate-200 shadow-sm';
+                        gHeader.innerHTML = `グループなし`;
+                        container.appendChild(gHeader);
+                    }
+                }
+        
+                const pTasks = filterTasks.filter(t => (t.projectId || null) === project.id);
+                if (pTasks.length === 0) return;
+
+                const projectDiv = document.createElement('div');
+                projectDiv.className = `flex flex-col mb-8 bg-white rounded-2xl border-2 border-slate-200 shadow-sm overflow-hidden flex-shrink-0 min-w-max`;
+
+                const isCompProj = project.id ? isProjectCompleted(project.id) : false;
+                const projOp = isCompProj ? 'opacity-70' : '';
+
+                const pHeader = document.createElement('div');
+                pHeader.className = `p-4 bg-slate-50 border-b-2 border-slate-200 flex justify-between items-center ${projOp} sticky left-0 z-10 w-screen max-w-full`;
+                pHeader.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="w-3 h-3 rounded-full" style="background-color: ${project.color}"></div>
+                        <h2 class="font-black text-slate-800 text-lg font-mono uppercase tracking-widest">${project.name}</h2>
+                        ${isCompProj ? '<span class="text-[10px] font-bold bg-slate-200 text-slate-500 px-2 py-0.5 rounded-full">完了済</span>' : ''}
+                    </div>
+                    <span class="text-xs font-bold text-slate-500 bg-white px-3 py-1 rounded-full shadow-sm border border-slate-200">計 ${pTasks.length} タスク</span>
+                `;
+                projectDiv.appendChild(pHeader);
+
+                const lanesContainer = document.createElement('div');
+                lanesContainer.className = `flex gap-6 p-6 min-h-[250px] bg-slate-100/50`;
+
+                columns.forEach(col => {
+                    let colTasks = pTasks.filter(t => t.status === col.id);
+                    if (hideDone && col.id === 'done') colTasks = [];
+
+                    colTasks.sort((a, b) => {
+                        const da = a.dueDate ? a.dueDate : '9999-12-31';
+                        const db = b.dueDate ? b.dueDate : '9999-12-31';
+                        return da.localeCompare(db);
+                    });
+
+                    const colDiv = document.createElement('div');
+                    colDiv.className = `flex flex-col bg-white rounded-2xl w-[450px] flex-shrink-0 border-2 border-slate-200/60 shadow-sm overflow-hidden`;
+                    
+                    const titleColorClass = col.id === 'in_progress' ? 'text-cyan-700' : (col.id === 'done' ? 'text-fuchsia-700' : 'text-slate-500');
+                    const borderTopClass = col.id === 'in_progress' ? 'border-t-4 border-cyan-500' : (col.id === 'done' ? 'border-t-4 border-fuchsia-500' : 'border-t-4 border-slate-300');
+
+                    const gridClass = `grid grid-cols-1 xl:grid-cols-2 gap-4`;
+
+                    colDiv.innerHTML = `
+                        <div class="p-4 border-b-2 border-slate-100 flex justify-between items-center bg-slate-50/50 ${borderTopClass}">
+                            <div class="flex items-center gap-3"><i class="fa-solid ${col.icon} ${titleColorClass}"></i><h3 class="font-black ${titleColorClass} text-sm font-mono tracking-widest uppercase">${col.title}</h3></div>
+                            <span class="bg-slate-800 text-white text-xs font-mono font-black px-2 py-0.5 rounded-full shadow-md">${colTasks.length}</span>
+                        </div>
+                        <div class="p-4 flex-1 ${gridClass} drop-zone min-h-[150px] content-start" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="dropTask(event, '${col.id}', '${project.id || ''}')"></div>
+                    `;
+                    const taskContainer = colDiv.querySelector('.drop-zone');
+                    
+                    colTasks.forEach(task => {
+                        const compSub = task.subtasks.filter(s => s.completed).length;
+                        const isComp = isProjectCompleted(task.projectId);
+                        const overdue = isOverdue(task);
+                        const delayed = isDelayed(task);
+                        const isSelected = state.selectedTasks.has(task.id);
+
+                        const borderClass = overdue ? 'border-fuchsia-500 shadow-[0_0_15px_rgba(217,70,239,0.2)]' : (delayed ? 'border-amber-500' : (isSelected ? 'border-cyan-500 shadow-[0_0_15px_rgba(14,165,233,0.2)]' : 'border-slate-200'));
+                        const opacityClass = isComp ? 'opacity-50 grayscale-[0.5]' : '';
+
+                        const card = document.createElement('div');
+                        card.className = `task-card bg-white p-5 rounded-xl border-2 ${borderClass} ${opacityClass} hover:border-cyan-400 transition-all relative overflow-hidden group shadow-sm hover:shadow-md flex flex-col`;
+                        card.draggable = true;
+                        card.ondragstart = (e) => dragStart(e, task.id);
+                        card.ondblclick = () => openTaskModal(task.id);
+                        
+                        let alertBadge = '';
+                        if (isComp) {
+                            alertBadge = `<div class="text-slate-500 text-[10px] font-mono font-black mb-3 bg-slate-100 px-2 py-1 rounded border border-slate-200 inline-block uppercase tracking-tighter"><i class="fa-solid fa-box-archive mr-1"></i>アーカイブ済</div>`;
+                        } else if (overdue) {
+                            alertBadge = `<div class="text-fuchsia-600 text-[10px] font-mono font-black mb-3 bg-fuchsia-50 px-2 py-1 rounded border border-fuchsia-200 inline-block uppercase tracking-tighter"><i class="fa-solid fa-triangle-exclamation mr-1"></i>納期遅れ</div>`;
+                        } else if (delayed) {
+                            alertBadge = `<div class="text-amber-600 text-[10px] font-mono font-black mb-3 bg-amber-50 px-2 py-1 rounded border border-amber-200 inline-block uppercase tracking-tighter"><i class="fa-solid fa-triangle-exclamation mr-1"></i>着手遅れ</div>`;
+                        }
+
+                        const dateColor = overdue ? 'text-fuchsia-600' : (delayed ? 'text-amber-600' : 'text-slate-400');
+                        const titleColor = overdue ? 'text-fuchsia-700' : 'text-slate-800';
+
+                        card.innerHTML = `
+                            <div class="absolute left-0 top-0 bottom-0 w-1.5" style="background-color: ${project.color}"></div>
+                            <input type="checkbox" class="absolute top-4 right-4 w-5 h-5 cursor-pointer bg-white border-2 border-slate-200 text-cyan-500 rounded focus:ring-cyan-500 z-10" 
+                                   onclick="event.stopPropagation(); toggleTaskSelection('${task.id}', this.checked)" ${isSelected ? 'checked' : ''}>
+                            
+                            <div class="pl-3 flex-1 flex flex-col">
+                                ${alertBadge}
+                                <h4 class="font-black ${titleColor} text-sm mb-2 pr-6 leading-snug tracking-tight uppercase">${task.title}</h4>
+                                <div class="text-[11px] text-slate-400 line-clamp-2 mb-4 font-mono font-bold leading-relaxed">${(task.memoLogs && task.memoLogs.length > 0) ? task.memoLogs[0].content : ''}</div>
+                                <div class="flex items-center justify-between mt-auto pt-3 border-t border-slate-50">
+                                    <div class="flex items-center gap-2 text-[11px] font-mono font-black text-cyan-600" title="Progress">
+                                        <i class="fa-solid fa-microchip"></i>
+                                        <span>${compSub}/${task.subtasks.length}</span>
+                                    </div>
+                                    <div class="flex items-center gap-2 text-[11px] font-mono font-black ${dateColor}"><i class="fa-regular fa-clock"></i><span>${task.dueDate ? task.dueDate.substring(5).replace('-','.') : '---'}</span></div>
+                                </div>
+                            </div>
+                            <div class="absolute bottom-0 left-0 right-0 bg-cyan-600 text-[10px] font-mono font-black text-center py-0.5 text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none uppercase tracking-widest">Execute_Command</div>
+                        `;
+                        taskContainer.appendChild(card);
+                    });
+                    
+                    lanesContainer.appendChild(colDiv);
+                });
+                
+                projectDiv.appendChild(lanesContainer);
+                container.appendChild(projectDiv);
+            });
+        }
         let draggedTaskId = null;
         function dragStart(ev, taskId) { draggedTaskId = taskId; ev.dataTransfer.setData("text/plain", taskId); setTimeout(() => ev.target.classList.add('opacity-50'), 0); }
         function allowDrop(ev) { ev.preventDefault(); ev.target.closest('.drop-zone')?.classList.add('drag-over'); }
         function dragLeave(ev) { ev.target.closest('.drop-zone')?.classList.remove('drag-over'); }
-        
         async function dropTask(ev, targetStatus, targetProjectId) {
             ev.preventDefault(); ev.target.closest('.drop-zone')?.classList.remove('drag-over');
             if(!draggedTaskId) return;
@@ -2513,11 +2957,9 @@ function renderWeekly() {
             draggedTaskId = null;
             await saveDoc('tasks', task.id, task);
         }
-
         function toggleGanttTask(taskId) { state.expandedGanttTasks.has(taskId) ? state.expandedGanttTasks.delete(taskId) : state.expandedGanttTasks.add(taskId); renderGantt(); }
 
         function generateGanttHTML(startDate, endDate, projects, tasksToRender, cellWidth = 48, headerWidth = 380) {
-            let html = '';
             const isPrint = document.body.classList.contains('print-gantt');
             const currentHeaderWidth = isPrint ? (headerWidth || 250) : headerWidth;
             const currentCellWidth = cellWidth;
@@ -2528,214 +2970,330 @@ function renderWeekly() {
 
             const dailyHours = new Array(totalDays).fill(0);
             const isHolidayCache = {}; dates.forEach(d => { isHolidayCache[d.getTime()] = !isBusinessDay(d); });
-            
-            const groupedProjects = {};
-            const ungroupedProjects = [];
-            projects.forEach(p => {
-                if(p.groupId) {
-                    if(!groupedProjects[p.groupId]) groupedProjects[p.groupId] = [];
-                    groupedProjects[p.groupId].push(p);
-                } else {
-                    ungroupedProjects.push(p);
-                }
+            projects.sort((a, b) => {
+                const groupA = state.projectGroups.find(g => g.id === a.groupId);
+                const groupB = state.projectGroups.find(g => g.id === b.groupId);
+                const orderA = groupA ? (groupA.order || 0) : 9999;
+                const orderB = groupB ? (groupB.order || 0) : 9999;
+                if (orderA !== orderB) return orderA - orderB;
+                return a.name.localeCompare(b.name);
+            });
+            projects.forEach(proj => {
+                const pTasks = tasksToRender.filter(t => t.projectId === proj.id);
+                pTasks.forEach(task => {
+                    if (task.startDate && task.dueDate && task.totalHours > 0) {
+                        const ts = new Date(task.startDate).setHours(0,0,0,0);
+                        const te = new Date(task.dueDate).setHours(0,0,0,0);
+                        let bDays = 0;
+                        for(let t=ts; t<=te; t+=86400000) { if(isBusinessDay(new Date(t))) bDays++; }
+                        if(bDays > 0) {
+                            const progSum = task.subtasks.reduce((sum, s) => sum + ((s.progress||0) * (s.hours||0)), 0);
+                            const totalH = task.totalHours || 1;
+                            const progressPercent = task.status === 'done' ? 100 : Math.round(progSum / totalH);
+                            const remainingHours = task.status === 'done' ? 0 : task.totalHours * (1 - (progressPercent / 100));
+                            const hoursPerDay = remainingHours / bDays;
+                            
+                            dates.forEach((d, i) => {
+                                const time = d.getTime();
+                                if(time >= ts && time <= te && isBusinessDay(d)) dailyHours[i] += hoursPerDay;
+                            });
+                        }
+                    }
+                });
             });
 
-            const renderProj = (proj, isLastInGroup) => {
-                const pTasks = tasksToRender.filter(t => t.projectId === proj.id);
-                if (pTasks.length === 0 && !isPrint) {
-                    // Always show project row even if empty, for milestones
+            const weeks = [];
+            let currentWeek = null;
+            dates.forEach((d, i) => {
+                const isMonday = d.getDay() === 1;
+                if (!currentWeek || isMonday || i === 0) {
+                    currentWeek = { 
+                        label: `${d.getMonth()+1}/${d.getDate()}~`, 
+                        span: 0, 
+                        hours: 0, 
+                        start: dateUtils.formatDate(d),
+                        end: ''
+                    };
+                    weeks.push(currentWeek);
+                }
+                currentWeek.span++;
+                currentWeek.hours += dailyHours[i];
+                currentWeek.end = dateUtils.formatDate(d);
+            });
+
+            const stickyClass = isPrint ? "" : "sticky left-0 z-30 shadow-[4px_0_10px_rgba(0,0,0,0.05)]";
+            const headerStickyClass = isPrint ? "" : "sticky top-0 z-40";
+
+            const pbClass = isPrint ? 'pb-2' : 'pb-12';
+            const headerBg = 'bg-white';
+
+            let html = `<div class="min-w-max bg-white relative ${pbClass}" style="width: max-content;">`;
+            
+            // Header Grid
+            html += `<div style="display: grid; grid-template-columns: ${currentHeaderWidth}px repeat(${totalDays}, ${currentCellWidth}px);" class="border-b-2 border-slate-200 ${headerStickyClass} ${headerBg} shadow-sm">
+                        <div class="border-r-2 border-slate-200 bg-slate-50 flex items-center p-4 row-span-3 ${stickyClass} !z-50 w-full h-full border-b-2 border-b-slate-200">
+                            <span class="font-black text-cyan-800 text-xs font-mono uppercase tracking-[0.2em]">System_Timeline / Project_Map</span>
+                        </div>`;
+            
+            // Row 1: Months
+            let curMonth = -1; let mSpan = 0;
+            dates.forEach((d, i) => {
+                if(d.getMonth() !== curMonth) {
+                    if(mSpan>0) html += `<div style="grid-column: span ${mSpan};" class="border-r border-slate-200 bg-slate-100 text-center text-xs py-1.5 font-mono font-black text-slate-500 uppercase tracking-widest border-b border-slate-200">${dates[i-1].getMonth()+1}_Month</div>`;
+                    curMonth = d.getMonth(); mSpan = 1;
+                } else { mSpan++; }
+                if(i === dates.length-1) html += `<div style="grid-column: span ${mSpan};" class="border-r border-slate-200 bg-slate-100 text-center text-xs py-1.5 font-mono font-black text-slate-500 uppercase tracking-widest border-b border-slate-200">${d.getMonth()+1}_Month</div>`;
+            });
+
+            // Row 2: Weekly Workload
+            weeks.forEach(w => {
+                let alertClass = 'bg-slate-50 text-slate-400';
+                let icon = '';
+                
+                if (w.hours > 30) {
+                    alertClass = 'bg-fuchsia-50 text-fuchsia-600 border-x-2 border-fuchsia-100';
+                    icon = `<i class="fa-solid fa-fire text-fuchsia-500 mr-1.5"></i>`;
+                } else if (w.hours > 20) {
+                    alertClass = 'bg-amber-50 text-amber-600 border-x-2 border-amber-100';
+                    icon = `<i class="fa-solid fa-triangle-exclamation text-amber-500 mr-1.5"></i>`;
                 }
 
-                html += '<div class="project-group relative ' + (isLastInGroup ? '' : 'border-b border-slate-200') + '">';
-                
-                html += '<div class="flex border-b-2 border-slate-200 bg-white shadow-sm">';
-                
-                const isCompleted = isProjectCompleted(proj.id);
-                html += '<div style="width: ' + currentHeaderWidth + 'px; min-width: ' + currentHeaderWidth + 'px;" class="py-3 px-4 border-r-2 border-slate-200 sticky left-0 z-10 bg-white flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors" onclick="openProjectModal(\'' + proj.id + '\')">';
-                html += '<div class="flex items-center gap-3 overflow-hidden">';
-                html += '<div class="w-4 h-4 rounded-full shadow-sm shrink-0" style="background-color: ' + proj.color + '"></div>';
-                html += '<div class="font-black text-sm text-slate-800 truncate tracking-widest ' + (isCompleted ? 'line-through opacity-50' : '') + '">' + proj.name + '</div>';
-                html += '</div>';
-                
-                const activeCount = pTasks.filter(t => t.status !== 'done').length;
-                if(activeCount > 0) {
-                    html += '<div class="text-[10px] font-black bg-amber-100 text-amber-700 px-2 py-0.5 rounded shadow-sm">' + activeCount + '</div>';
-                }
-                html += '</div>';
-                
-                html += '<div class="flex-1 flex relative bg-slate-50/30">';
-                
-                dates.forEach(d => {
-                    const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-                    const isHoliday = isHolidayCache[d.getTime()] || false;
-                    let cellBg = '';
-                    if (isPrint) {
-                        cellBg = (isWeekend || isHoliday) ? 'bg-gray-100' : 'bg-white';
-                    } else {
-                        cellBg = (isWeekend || isHoliday) ? 'bg-slate-100/80' : 'bg-transparent';
-                        if (d.getTime() === today.getTime()) cellBg = 'bg-amber-50';
+                html += `<div onclick="filterGanttByWeek('${w.start}', '${w.end}')" style="grid-column: span ${w.span};" class="border-r border-b border-slate-200 ${alertClass} text-center text-[11px] font-mono py-2 font-black flex items-center justify-center overflow-hidden cursor-pointer hover:bg-white hover:text-cyan-600 transition-all">
+                            ${icon} ${w.span >= 3 ? w.label : ''} <span class="ml-1.5 px-2 bg-white/60 rounded border border-slate-200 shadow-sm">${parseFloat(w.hours.toFixed(1))}h</span>
+                         </div>`;
+            });
+
+            // Row 3: Days
+            dates.forEach(d => {
+                const isHol = !isBusinessDay(d); const isToday = d.toDateString() === today.toDateString();
+                const bg = isToday ? 'bg-cyan-500/10' : (isHol ? 'bg-slate-50' : 'bg-transparent');
+                const txt = isToday ? 'text-cyan-700 font-black' : (d.getDay()===0?'text-fuchsia-500':d.getDay()===6?'text-cyan-600':(isHol?'text-slate-300':'text-slate-500'));
+                html += `<div class="border-r border-slate-200 text-center text-[11px] font-mono py-1.5 ${bg} ${txt}">${d.getDate()}</div>`;
+            });
+            html += `</div>`;
+
+            // Background Grid
+            const headerHeight = isPrint ? 80 : 96;
+            html += `<div class="absolute top-[${headerHeight}px] bottom-0 left-0 right-0 pointer-events-none z-0" style="display: grid; grid-template-columns: ${currentHeaderWidth}px repeat(${totalDays}, ${currentCellWidth}px);">`;
+            html += `<div class="border-r-2 border-slate-200 h-full"></div>`;
+            let todayOffsetLeft = 0;
+            dates.forEach((d, i) => {
+                const isHol = !isBusinessDay(d);
+                if (d.toDateString() === today.toDateString()) todayOffsetLeft = currentHeaderWidth + (i * currentCellWidth) + (currentCellWidth / 2);
+                html += `<div class="border-r border-slate-100 h-full ${isHol ? 'holiday-bg' : ''}"></div>`;
+            });
+            if (todayOffsetLeft > 0) html += `<div class="absolute inset-y-0 w-1 bg-cyan-500 shadow-[0_0_15px_#0ea5e9] z-20 opacity-60" style="left: ${todayOffsetLeft-2}px;"></div>`;
+            html += `</div>`;
+
+            html += `<div class="relative z-10">`;
+            
+            let currentGroupId = 'INITIAL';
+            projects.forEach((proj, pIndex) => {
+                if (proj.groupId !== currentGroupId) {
+                    currentGroupId = proj.groupId;
+                    const group = state.projectGroups.find(g => g.id === proj.groupId);
+                    if (group) {
+                        html += '<div class="gantt-group-header flex bg-slate-200 border-b-2 border-slate-300">';
+                        html += '<div style="width: ' + currentHeaderWidth + 'px; min-width: ' + currentHeaderWidth + 'px;" class="py-1 px-4 border-r-2 border-slate-300 sticky left-0 z-10 flex items-center gap-2 bg-slate-200">';
+                        html += '<div class="w-3 h-3 rounded shadow-sm" style="background-color: ' + group.color + '"></div>';
+                        html += '<h3 class="font-bold text-xs text-slate-700">' + group.name + '</h3>';
+                        html += '</div>';
+                        html += '<div class="flex-1 border-b-2 border-slate-300"></div>';
+                        html += '</div>';
+                    } else if (proj.groupId === undefined || proj.groupId === null) {
+                        html += '<div class="gantt-group-header flex bg-slate-100 border-b-2 border-slate-200">';
+                        html += '<div style="width: ' + currentHeaderWidth + 'px; min-width: ' + currentHeaderWidth + 'px;" class="py-1 px-4 border-r-2 border-slate-200 sticky left-0 z-10 bg-slate-100">';
+                        html += '<h3 class="font-bold text-xs text-slate-500">グループなし</h3>';
+                        html += '</div>';
+                        html += '<div class="flex-1 border-b-2 border-slate-200"></div>';
+                        html += '</div>';
                     }
-                    html += '<div style="width: ' + currentCellWidth + 'px; min-width: ' + currentCellWidth + 'px;" class="border-r border-dashed border-slate-200 ' + cellBg + '"></div>';
-                });
+                }
+        
+                const pTasks = tasksToRender.filter(t => t.projectId === proj.id).sort((a,b)=> new Date(a.startDate||'2099') - new Date(b.startDate||'2099'));
+                const isComp = isProjectCompleted(proj.id);
+                const projOpacity = isComp ? 'opacity-40 grayscale-[0.8]' : '';
 
-                if(proj.milestones) {
+                if (pIndex > 0) {
+                    html += `
+                    <div class="flex h-6 border-b border-slate-100">
+                        <div style="width: ${currentHeaderWidth}px; min-width: ${currentHeaderWidth}px;" class="border-r-2 border-slate-200 bg-slate-50/40 ${stickyClass}"></div>
+                        <div class="flex-1"></div>
+                    </div>`;
+                }
+
+                                const projStickyClass = isPrint ? "" : `sticky top-[${headerHeight}px] z-30`;
+                
+                let projectLegendHtml = '';
+                const startT = startDate ? startDate.getTime() : 0;
+                const endT = endDate ? endDate.getTime() : Infinity;
+                if(proj.milestones && proj.milestones.length > 0) {
+                    const legendMap = new Map();
                     proj.milestones.forEach(ms => {
+                        let visible = false;
+                        if (startDate && endDate) {
+                            if (ms.type === 'point' && ms.date) {
+                                const t = new Date(ms.date).setHours(0,0,0,0);
+                                visible = (t >= startT && t <= endT);
+                            } else if (ms.type === 'range' && ms.startDate && ms.endDate) {
+                                const ts = new Date(ms.startDate).setHours(0,0,0,0);
+                                const te = new Date(ms.endDate).setHours(0,0,0,0);
+                                visible = (te >= startT && ts <= endT);
+                            }
+                        }
+                        if(visible && !legendMap.has(ms.name)) {
+                            legendMap.set(ms.name, `<div class="flex items-center gap-1.5"><i class="fa-solid ${ms.icon||'fa-flag'}" style="color:${ms.color||'#4b5563'}"></i><span>${ms.name}</span></div>`);
+                        }
+                    });
+                    if (legendMap.size > 0) {
+                        projectLegendHtml = `<div class="mt-2 text-[10px] flex flex-wrap gap-x-3 gap-y-1 text-slate-500 font-bold tracking-widest not-italic">` + Array.from(legendMap.values()).join('') + `</div>`;
+                    }
+                }
+
+                html += `
+                <div class="project-group relative">
+                <div class="flex border-y-2 border-slate-200 bg-slate-100/50 backdrop-blur-sm shadow-sm ${projOpacity} ${projStickyClass}">
+                    <div style="width: ${currentHeaderWidth}px; min-width: ${currentHeaderWidth}px;" class="p-4 border-r-2 border-slate-200 ${stickyClass} flex flex-col justify-center bg-slate-50/90 font-black text-slate-800 text-base font-mono uppercase tracking-tight italic">
+                        <div class="flex items-center">
+                            <div class="w-4 h-4 rounded-sm mr-3 shadow-md flex-shrink-0" style="background-color: ${proj.color}"></div>
+                            <span class="truncate">${proj.name}${isComp ? ' [完了]' : ''}</span>
+                        </div>
+                        ${projectLegendHtml}
+                    </div>
+                    <div class="relative flex-1 py-4" style="width: ${totalDays * currentCellWidth}px; min-height: 56px;">
+                `;
+                
+                if(proj.milestones && proj.milestones.length > 0) {
+                    proj.milestones.forEach(ms => {
+                        const iconClass = ms.icon || 'fa-flag';
+                        const colorClass = ms.color || '#4b5563';
+                        
                         if (ms.type === 'point' && ms.date) {
-                            const md = new Date(ms.date).setHours(0,0,0,0);
-                            if (md >= startDate.getTime() && md <= endDate.getTime()) {
-                                const dayIdx = dates.findIndex(d => d.getTime() === md);
-                                if(dayIdx !== -1) {
-                                    const left = dayIdx * currentCellWidth;
-                                    html += '<div class="absolute top-0 bottom-0 flex items-center justify-center z-10" style="left: ' + left + 'px; width: ' + currentCellWidth + 'px;" title="' + ms.name + '">';
-                                    html += '<i class="fa-solid ' + (ms.icon||'fa-flag') + ' drop-shadow-md text-lg" style="color: ' + (ms.color||'#4b5563') + '"></i>';
-                                    html += '</div>';
-                                }
+                            const t = new Date(ms.date).setHours(0,0,0,0);
+                            if(t >= startDate.getTime() && t <= endDate.getTime()) {
+                                const offset = (t - startDate.getTime()) / (1000*60*60*24);
+                                const left = offset * currentCellWidth + (currentCellWidth/2);
+                                html += `<div class="absolute top-1/2 -translate-y-1/2 flex flex-col items-center group cursor-help z-20" style="left: ${left}px;">
+                                            <i class="fa-solid ${iconClass} text-sm filter drop-shadow-sm transition-all group-hover:scale-125" style="color:${colorClass}"></i>
+                                            <span class="${isPrint ? 'relative text-[8px] text-slate-600 font-bold mt-1' : 'absolute top-full mt-2 bg-slate-800 border border-slate-700 text-white text-[10px] font-mono font-bold opacity-0 group-hover:opacity-100 z-50 shadow-xl'} px-3 py-1 rounded whitespace-nowrap uppercase tracking-widest transition-all">${ms.name}</span>
+                                         </div>`;
                             }
                         } else if (ms.type === 'range' && ms.startDate && ms.endDate) {
-                            const ts = new Date(ms.startDate).setHours(0,0,0,0);
-                            const te = new Date(ms.endDate).setHours(0,0,0,0);
-                            if (te >= startDate.getTime() && ts <= endDate.getTime()) {
-                                const dStart = Math.max(ts, startDate.getTime());
-                                const dEnd = Math.min(te, endDate.getTime());
-                                const startIdx = dates.findIndex(d => d.getTime() === dStart);
-                                const endIdx = dates.findIndex(d => d.getTime() === dEnd);
-                                if(startIdx !== -1 && endIdx !== -1) {
-                                    const left = startIdx * currentCellWidth;
-                                    const w = (endIdx - startIdx + 1) * currentCellWidth;
-                                    html += '<div class="absolute top-2 bottom-2 opacity-30 rounded border" style="left: ' + left + 'px; width: ' + w + 'px; background-color: ' + (ms.color||'#4b5563') + '"></div>';
-                                    html += '<div class="absolute top-1/2 -translate-y-1/2 text-[10px] font-black truncate px-1 z-10" style="left: ' + left + 'px; width: ' + w + 'px; color: ' + (ms.color||'#4b5563') + '">' + ms.name + '</div>';
-                                }
+                            const ts = new Date(ms.startDate).setHours(0,0,0,0); const te = new Date(ms.endDate).setHours(0,0,0,0);
+                            if(te >= startDate.getTime() && ts <= endDate.getTime()) {
+                                const os = Math.max(0, (ts - startDate.getTime()) / (1000*60*60*24));
+                                const oe = Math.min(totalDays-1, (te - startDate.getTime()) / (1000*60*60*24));
+                                const left = os * currentCellWidth; const w = (oe - os + 1) * currentCellWidth;
+                                
+                                html += `<div class="absolute top-1/2 -translate-y-1/2 h-2.5 rounded-full opacity-30 border-2 border-white group z-10 flex items-center" style="left: ${left}px; width: ${w}px; background-image: repeating-linear-gradient(45deg, transparent, transparent 6px, rgba(255,255,255,0.2) 6px, rgba(255,255,255,0.2) 12px); background-color: ${colorClass}; shadow: inset 0 2px 4px rgba(0,0,0,0.1);">
+                                            <span class="${isPrint ? 'relative text-[8px] text-slate-600 font-bold mb-1' : 'absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-slate-800 border border-slate-700 text-white text-[10px] font-mono font-bold opacity-0 group-hover:opacity-100 z-50 shadow-xl'} px-3 py-1 rounded whitespace-nowrap uppercase tracking-widest transition-all">${ms.name}</span>
+                                         </div>`;
                             }
                         }
                     });
                 }
-                
+                html += `</div></div>`;
+
                 pTasks.forEach(task => {
+                    const isExp = state.expandedGanttTasks.has(task.id);
+                    const overdue = isOverdue(task);
+                    const delayed = isDelayed(task);
+                    
+                    let alertIcon = '';
+                    if (overdue) alertIcon = `<i class="fa-solid fa-triangle-exclamation text-fuchsia-600 text-xs"></i>`;
+                    else if (delayed) alertIcon = `<i class="fa-solid fa-triangle-exclamation text-amber-600 text-xs"></i>`;
+
+                    const titleClass = overdue ? 'text-fuchsia-700 font-black' : (delayed ? 'text-amber-700 font-black' : 'text-slate-600 font-bold');
+
+                    html += `
+                    <div class="flex border-b border-slate-100 hover:bg-slate-50 transition-colors group">
+                        <div style="width: ${currentHeaderWidth}px; min-width: ${currentHeaderWidth}px;" class="py-2.5 pl-8 pr-4 border-r-2 border-slate-200 bg-white ${stickyClass} flex items-center justify-between group-hover:bg-slate-50">
+                            <div class="flex items-center gap-3 overflow-hidden w-full cursor-pointer" onclick="toggleGanttTask('${task.id}')">
+                                <i class="fa-solid ${task.subtasks.length > 0 ? (isExp ? 'fa-chevron-down' : 'fa-chevron-right') : 'fa-minus text-[8px]'} text-slate-400 w-5 text-sm"></i>
+                                ${alertIcon}
+                                <div class="truncate flex-1 text-[13px] font-mono uppercase tracking-tight ${titleClass}" title="${task.title}">${task.title}</div>
+                            </div>
+                            <div class="text-[11px] font-mono font-black text-slate-400 w-10 text-right flex-shrink-0">${task.totalHours}h</div>
+                        </div>
+                        <div class="relative flex-1 py-2.5" style="width: ${totalDays * currentCellWidth}px;">
+                    `;
+
                     if (task.startDate && task.dueDate) {
-                        const ts = new Date(task.startDate).setHours(0,0,0,0);
-                        const te = new Date(task.dueDate).setHours(0,0,0,0);
-                        
+                        const ts = new Date(task.startDate).setHours(0,0,0,0); const te = new Date(task.dueDate).setHours(0,0,0,0);
                         if (te >= startDate.getTime() && ts <= endDate.getTime()) {
-                            const dStart = Math.max(ts, startDate.getTime());
-                            const dEnd = Math.min(te, endDate.getTime());
-                            const startIdx = dates.findIndex(d => d.getTime() === dStart);
-                            const endIdx = dates.findIndex(d => d.getTime() === dEnd);
+                            const os = Math.max(0, (ts - startDate.getTime()) / (1000*60*60*24));
+                            const oe = Math.min(totalDays - 1, (te - startDate.getTime()) / (1000*60*60*24));
+                            const left = os * currentCellWidth; const w = (oe - os + 1) * currentCellWidth;
                             
-                            if(startIdx !== -1 && endIdx !== -1) {
-                                const left = startIdx * currentCellWidth;
-                                const w = (endIdx - startIdx + 1) * currentCellWidth;
-                                
-                                const progSum = task.subtasks.reduce((sum, s) => sum + ((s.progress||0) * (s.hours||0)), 0);
-                                const totalH = task.totalHours || 1;
-                                const progressPercent = task.status === 'done' ? 100 : Math.round(progSum / totalH);
-                                
-                                html += '<div class="absolute top-1/2 -translate-y-1/2 h-8 rounded-lg shadow-sm border border-black/10 overflow-hidden cursor-pointer hover:ring-2 hover:ring-black/20 transition-all group z-20 flex items-center" style="left: ' + left + 'px; width: ' + w + 'px; background-color: ' + proj.color + '40;" onclick="openTaskModal(\'' + task.id + '\')">';
-                                html += '<div class="absolute left-0 top-0 bottom-0 opacity-40 transition-all" style="width: ' + progressPercent + '%; background-color: ' + proj.color + '"></div>';
-                                html += '<div class="relative px-2 flex items-center justify-between w-full z-10">';
-                                html += '<span class="text-[11px] font-black truncate drop-shadow-md text-slate-800">' + task.title + '</span>';
-                                html += '<div class="flex items-center gap-1.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">';
-                                if(progressPercent > 0) html += '<span class="text-[9px] font-black bg-white/50 px-1 rounded">' + progressPercent + '%</span>';
-                                html += '<button onclick="event.stopPropagation(); toggleGanttTask(\'' + task.id + '\')" class="text-black/50 hover:text-black bg-white/50 w-5 h-5 rounded flex items-center justify-center"><i class="fa-solid ' + (state.expandedGanttTasks.has(task.id) ? 'fa-angle-up' : 'fa-angle-down') + '"></i></button>';
-                                html += '</div>';
-                                html += '</div>';
-                                html += '</div>';
-                            }
+                            const progSum = task.subtasks.reduce((sum, s) => sum + ((s.progress||0) * (s.hours||0)), 0);
+                            const totalH = task.totalHours || 1;
+                            const progressPercent = task.status === 'done' ? 100 : Math.round(progSum / totalH);
+                            
+                            const barColor = overdue ? '#d946ef' : (delayed ? '#eab308' : proj.color);
+                            const barOpacity = task.status === 'done' ? '0.4' : '1';
+                            const barShadow = task.status === 'done' ? 'none' : `0 4px 10px ${barColor}30`;
+
+                            html += `
+                                <div class="absolute h-5 rounded-md shadow-sm flex items-center overflow-hidden cursor-pointer transition-all hover:scale-[1.02] border-2 border-white" 
+                                     style="left: ${left+2}px; width: ${w-4}px; background-color: ${barColor}20; top: 50%; transform: translateY(-50%); box-shadow: ${barShadow};"
+                                     onclick="openTaskModal('${task.id}')" title="${task.title} (${progressPercent}%)">
+                                    <div class="absolute left-0 top-0 bottom-0 shadow-inner" style="width: ${progressPercent}%; background-color: ${barColor}; opacity: ${barOpacity};"></div>
+                                    <span class="relative z-10 px-2 text-[10px] font-black text-slate-800 bg-white/60 rounded px-1 drop-shadow-sm truncate">${w > 45 ? progressPercent+'%' : ''}</span>
+                                </div>
+                            `;
                         }
                     }
-                });
-                
-                html += '</div></div>';
+                    html += `</div></div>`;
 
-                const isExp = state.expandedGanttTasks;
-                pTasks.forEach(task => {
-                    if (isExp.has(task.id) && task.subtasks.length > 0) {
+                    if (isExp && task.subtasks.length > 0) {
                         task.subtasks.forEach(st => {
-                            html += '<div class="flex border-b border-dashed border-slate-200 bg-slate-50/30">';
-                            html += '<div style="width: ' + currentHeaderWidth + 'px; min-width: ' + currentHeaderWidth + 'px;" class="py-2 pl-14 pr-4 border-r-2 border-slate-200 sticky left-0 z-10 bg-white flex items-center justify-between">';
-                            html += '<div class="flex items-center gap-2.5 overflow-hidden">';
-                            html += '<i class="' + (st.completed ? 'fa-solid fa-square-check text-cyan-500' : 'fa-regular fa-square text-slate-300') + ' text-xs"></i>';
-                            html += '<span class="truncate text-[12px] font-mono font-bold text-slate-500 uppercase ' + (st.completed ? 'line-through opacity-50' : '') + '">' + st.title + '</span>';
-                            html += '</div>';
-                            html += '<div class="flex gap-2.5 text-[10px] font-mono font-black text-slate-400 uppercase"><span>' + (st.progress||0) + '%</span><span>' + (st.hours||0) + 'h</span></div>';
-                            html += '</div>';
-                            
-                            html += '<div class="flex-1 flex relative">';
-                            dates.forEach(d => {
-                                const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-                                const isHoliday = isHolidayCache[d.getTime()] || false;
-                                let cellBg = '';
-                                if (isPrint) cellBg = (isWeekend || isHoliday) ? 'bg-gray-100' : 'bg-white';
-                                else cellBg = (isWeekend || isHoliday) ? 'bg-slate-100/50' : 'bg-transparent';
-                                html += '<div style="width: ' + currentCellWidth + 'px; min-width: ' + currentCellWidth + 'px;" class="border-r border-dashed border-slate-200 ' + cellBg + '"></div>';
-                            });
-                            
-                            if (task.startDate && task.dueDate && st.hours) {
-                                const ts = new Date(task.startDate).setHours(0,0,0,0);
-                                const te = new Date(task.dueDate).setHours(0,0,0,0);
-                                if (te >= startDate.getTime() && ts <= endDate.getTime()) {
-                                    const dStart = Math.max(ts, startDate.getTime());
-                                    const dEnd = Math.min(te, endDate.getTime());
-                                    const startIdx = dates.findIndex(d => d.getTime() === dStart);
-                                    const endIdx = dates.findIndex(d => d.getTime() === dEnd);
-                                    if(startIdx !== -1 && endIdx !== -1) {
-                                        const left = startIdx * currentCellWidth;
-                                        const w = (endIdx - startIdx + 1) * currentCellWidth;
-                                        html += '<div class="absolute top-1/2 -translate-y-1/2 h-2 rounded-full overflow-hidden" style="left: ' + left + 'px; width: ' + w + 'px; background-color: ' + proj.color + '20;">';
-                                        html += '<div class="h-full" style="width: ' + (st.completed ? 100 : (st.progress||0)) + '%; background-color: ' + proj.color + '80;"></div>';
-                                        html += '</div>';
-                                    }
-                                }
-                            }
-                            html += '</div></div>';
-                        });
-                    }
+                            html += `
+                            <div class="flex border-b border-dashed border-slate-200 bg-slate-50/30">
+                                <div style="width: ${currentHeaderWidth}px; min-width: ${currentHeaderWidth}px;" class="py-2 pl-14 pr-4 border-r-2 border-slate-200 ${stickyClass} flex items-center justify-between">
+                                    <div class="flex items-center gap-2.5 overflow-hidden">
+                                        <i class="${st.completed ? 'fa-solid fa-square-check text-cyan-500' : 'fa-regular fa-square text-slate-300'} text-xs"></i>
+                                        <span class="truncate text-[12px] font-mono font-bold text-slate-500 uppercase ${st.completed ? 'line-through opacity-50' : ''}">${st.title}</span>
+                                    </div>
+                                    <div class="flex gap-2.5 text-[10px] font-mono font-black text-slate-400 uppercase"><span>${st.progress||0}%</span><span>${st.hours}h</span></div>
+                                </div>
+                                <div class="flex-1"></div>
+                            </div>`;
+                        });                    }
                 });
-                html += '</div>'; // close project-group
-            };
-
-            state.projectGroups.forEach(group => {
-                const groupProjects = groupedProjects[group.id];
-                if(groupProjects && groupProjects.length > 0) {
-                    html += '<div class="gantt-group-header flex bg-slate-100 border-b-2 border-slate-300">';
-                    html += '<div style="width: ' + currentHeaderWidth + 'px; min-width: ' + currentHeaderWidth + 'px;" class="py-2 px-4 border-r-2 border-slate-300 sticky left-0 z-10 flex items-center gap-3 bg-slate-100">';
-                    html += '<div class="w-4 h-4 rounded-md shadow-sm" style="background-color: ' + group.color + '"></div>';
-                    html += '<h3 class="font-black text-sm text-slate-800 tracking-widest">' + group.name + '</h3>';
-                    html += '</div>';
-                    html += '<div class="flex-1"></div>';
-                    html += '</div>';
-                    
-                    groupProjects.forEach((proj, idx) => { renderProj(proj, idx === groupProjects.length - 1); });
-                }
+                html += `</div>`; // End project-group
             });
-
-            if (ungroupedProjects.length > 0) {
-                html += '<div class="gantt-group-header flex bg-slate-50 border-b-2 border-slate-200">';
-                html += '<div style="width: ' + currentHeaderWidth + 'px; min-width: ' + currentHeaderWidth + 'px;" class="py-2 px-4 border-r-2 border-slate-200 sticky left-0 z-10 bg-slate-50">';
-                html += '<h3 class="font-bold text-xs text-slate-400 tracking-widest uppercase">グループなし</h3>';
-                html += '</div>';
-                html += '<div class="flex-1"></div>';
-                html += '</div>';
-                ungroupedProjects.forEach((proj, idx) => { renderProj(proj, idx === ungroupedProjects.length - 1); });
-            }
-            
-            html += '</div></div>';
+            html += `</div></div>`;
             return html;
-        
         }
 
-        function generateLegend(projects) {
+        function generateLegend(projects, startDate, endDate) {
             const legendMap = new Map();
+            const startT = startDate ? startDate.getTime() : 0;
+            const endT = endDate ? endDate.getTime() : Infinity;
+
             projects.forEach(p => {
                 if(p.milestones) {
                     p.milestones.forEach(ms => {
-                        if(!legendMap.has(ms.name)) {
+                        let visible = false;
+                        if (startDate && endDate) {
+                            if (ms.type === 'point' && ms.date) {
+                                const t = new Date(ms.date).setHours(0,0,0,0);
+                                visible = (t >= startT && t <= endT);
+                            } else if (ms.type === 'range' && ms.startDate && ms.endDate) {
+                                const ts = new Date(ms.startDate).setHours(0,0,0,0);
+                                const te = new Date(ms.endDate).setHours(0,0,0,0);
+                                visible = (te >= startT && ts <= endT);
+                            }
+                        }
+
+                        if(visible && !legendMap.has(ms.name)) {
                             legendMap.set(ms.name, `<div class="flex items-center gap-1.5"><i class="fa-solid ${ms.icon||'fa-flag'}" style="color:${ms.color||'#4b5563'}"></i><span>${ms.name}</span></div>`);
                         }
                     });
                 }
             });
             let html = Array.from(legendMap.values()).join('<span class="mx-2 text-slate-800">|</span>');
-            if(!html) html = '<span class="text-slate-600">有効な案件データはありません</span>';
+            if(!html) html = '<span class="text-slate-600">表示中のマイルストーンはありません</span>';
             document.getElementById('gantt-legend').innerHTML = `<span class="font-bold text-slate-300 mr-3 uppercase tracking-widest"><i class="fa-solid fa-tags mr-2 text-cyan-500"></i>マイルストーン凡例:</span>${html}`;
         }
 
@@ -2745,10 +3303,12 @@ function renderWeekly() {
             
             if (rangeType === 'month') { 
                 startDate = new Date(today.getFullYear(), today.getMonth(), 1); 
+                startDate.setDate(startDate.getDate() - 7);
                 endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0); 
             }
             else if (rangeType === 'multi-month') { 
                 startDate = new Date(today.getFullYear(), today.getMonth(), 1); 
+                startDate.setDate(startDate.getDate() - 7);
                 endDate = new Date(today.getFullYear(), today.getMonth() + 2, 0); 
             }
             else { 
@@ -2796,16 +3356,35 @@ function renderWeekly() {
                 filteredProjects = filteredProjects.filter(p => !isProjectCompleted(p.id));
             }
 
+            // Exclude 臨時 and 事務 from Gantt completely
+            filteredProjects = filteredProjects.filter(p => !p.name.includes('臨時') && !p.name.includes('事務'));
+
             // 2. Further filter by user selection if any
             if (state.ganttSelectedProjects.size > 0) {
                 filteredProjects = filteredProjects.filter(p => state.ganttSelectedProjects.has(p.id));
             }
 
-            generateLegend(filteredProjects);
-
-            const filteredTasks = state.tasks.filter(t => filteredProjects.some(p => p.id === t.projectId));
+                        const filteredTasks = state.tasks.filter(t => filteredProjects.some(p => p.id === t.projectId));
             const { startDate, endDate } = getGanttDateRange(rangeType, filteredTasks, filteredProjects);
+            
+            generateLegend(filteredProjects, startDate, endDate);
+
             container.innerHTML = generateGanttHTML(startDate, endDate, filteredProjects, filteredTasks);
+            
+            if (rangeType === 'all') {
+                setTimeout(() => {
+                    const today = new Date(); today.setHours(0,0,0,0);
+                    const diffTime = today - startDate;
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    if (diffDays > 0) {
+                        const cellWidth = 48;
+                        const headerWidth = 380;
+                        const scrollPos = headerWidth + (diffDays * cellWidth) - (window.innerWidth / 2);
+                        const wrapper = document.getElementById('gantt-container-wrapper');
+                        if (wrapper) wrapper.scrollLeft = Math.max(0, scrollPos);
+                    }
+                }, 50);
+            }
         }
 
         function filterGanttByWeek(startStr, endStr) {
@@ -2897,7 +3476,7 @@ function renderWeekly() {
             showModal, closeModal, showDialog,
             // Task Management
             openTaskModal, updateTaskTemplatesDropdown, loadTaskTemplate,
-            saveAsTemplate, deleteTaskTemplate, deleteCurrentTask, updateWorkingTask,
+            saveAsTemplate, deleteTaskTemplate, deleteCurrentTask, updateWorkingTask, addTaskMemoLog, deleteTaskMemoLog, addSubtaskMemoLog, deleteSubtaskMemoLog,
             addSubtask, removeSubtask, handleSubtaskChange, saveTask,
             // Milestone Management
             addMilestoneRow, removeMilestoneRow, moveMilestone, handleMilestoneChange, validateDynamicMilestones,
@@ -2905,7 +3484,9 @@ function renderWeekly() {
             openProjectTemplateModal, addTemplateMilestone, removeTemplateMilestone,
             moveTemplateMilestone, handleTemplateMilestoneChange, handleTemplateTaskChange, saveProjectTemplate,
             // Calendar & Holidays
-            openCalendarModal, addCompanyHoliday, removeCompanyHoliday, handlePrint
+            openCalendarModal, addCompanyHoliday, removeCompanyHoliday, handlePrint,
+            // Regular Meetings
+            openRegularMeetingModal, saveRegularMeetings
         });
 
     
