@@ -3517,3 +3517,61 @@ function renderProjectCards() {
         });
 
     
+
+        window.exportTimelineData = function() {
+            const exportData = [];
+
+            state.tasks.forEach(t => {
+                const proj = state.projects.find(p => p.id === t.projectId) || { name: '不明' };
+                if (proj.name.includes('臨時') || proj.name.includes('事務')) return;
+
+                let taskComments = [];
+
+                if (t.memoLogs && t.memoLogs.length > 0) {
+                    t.memoLogs.forEach(log => {
+                        taskComments.push({
+                            type: 'task',
+                            date: new Date(log.timestamp).toLocaleString('ja-JP'),
+                            content: log.content
+                        });
+                    });
+                }
+
+                if (t.subtasks && t.subtasks.length > 0) {
+                    t.subtasks.forEach(st => {
+                        if (st.memoLogs && st.memoLogs.length > 0) {
+                            st.memoLogs.forEach(log => {
+                                taskComments.push({
+                                    type: 'subtask',
+                                    subtaskTitle: st.title,
+                                    date: new Date(log.timestamp).toLocaleString('ja-JP'),
+                                    content: log.content
+                                });
+                            });
+                        }
+                    });
+                }
+
+                if (taskComments.length > 0) {
+                    exportData.push({
+                        taskId: t.id,
+                        projectName: proj.name,
+                        taskName: t.title,
+                        status: t.status,
+                        comments: taskComments.sort((a, b) => new Date(a.date) - new Date(b.date))
+                    });
+                }
+            });
+
+            if (exportData.length === 0) {
+                alert('出力対象のメモ履歴がありません。');
+                return;
+            }
+
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
+            const dlAnchorElem = document.createElement('a');
+            dlAnchorElem.setAttribute("href", dataStr);
+            dlAnchorElem.setAttribute("download", "timeline_data.json");
+            dlAnchorElem.click();
+        };
+    
