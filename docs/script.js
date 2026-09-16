@@ -1264,25 +1264,49 @@ function renderProjectCards() {
             const renderOptions = (currentValue) => {
                 let html = '<option value="all">すべての案件</option>';
                 const sorted = [...state.projects].sort((a, b) => {
+                    const groupA = state.projectGroups.find(g => g.id === a.groupId);
+                    const groupB = state.projectGroups.find(g => g.id === b.groupId);
+                    const orderA = groupA ? (groupA.order || 0) : 9999;
+                    const orderB = groupB ? (groupB.order || 0) : 9999;
+                    if (orderA !== orderB) return orderA - orderB;
+                    
                     const compA = isProjectCompleted(a.id);
                     const compB = isProjectCompleted(b.id);
                     if (compA !== compB) return compA ? 1 : -1;
                     return getProjectDueDate(a) - getProjectDueDate(b);
                 });
 
+                let currentGroupId = 'INITIAL';
+                let inOptGroup = false;
+
                 sorted.forEach(p => {
                     if (p.name.includes('臨時') || p.name.includes('事務')) return;
                     const isCompleted = isProjectCompleted(p.id);
+                    
                     if (!isCompleted || state.showCompletedProjects || currentValue === p.id) {
-                        html += `<option value="${p.id}" ${currentValue === p.id ? 'selected' : ''} class="${isCompleted ? 'text-slate-500' : ''}">${p.name}${isCompleted ? ' (完了)' : ''}</option>`;
+                        if (p.groupId !== currentGroupId) {
+                            if (inOptGroup) { html += '</optgroup>'; inOptGroup = false; }
+                            currentGroupId = p.groupId;
+                            const group = state.projectGroups.find(g => g.id === p.groupId);
+                            if (group) {
+                                html += `<optgroup label="■ ${group.name}">`;
+                                inOptGroup = true;
+                            }
+                        }
+                        
+                        let prefix = inOptGroup ? '　┗　' : '';
+                        html += `<option value="${p.id}" ${currentValue === p.id ? 'selected' : ''} class="${isCompleted ? 'text-slate-500' : ''}">${prefix}${p.name}${isCompleted ? ' (完了)' : ''}</option>`;
                     }
                 });
+                if (inOptGroup) html += '</optgroup>';
+                
                 return html;
             };
 
             if (kanbanSelect) kanbanSelect.innerHTML = renderOptions(kanbanSelect.value);
             if (weeklySelect) weeklySelect.innerHTML = renderOptions(weeklySelect.value);
         }
+
 
         function changeWeek(offset) {
             const d = new Date(state.weeklyBaseDate);
