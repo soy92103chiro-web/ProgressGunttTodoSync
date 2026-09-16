@@ -2281,6 +2281,8 @@ function renderProjectCards() {
             if (editingProjectId) {
                 const p = state.projects.find(x => x.id === editingProjectId);
                 p.name = name; p.milestones = cleanedMilestones;
+                p.groupId = groupId;
+                if(groupId) { const grp = state.projectGroups.find(g => g.id === groupId); if(grp) p.color = grp.color; }
                 if (!p.status) p.status = 'active';
                 await saveDoc('projects', p.id, p);
             } else {
@@ -2288,7 +2290,8 @@ function renderProjectCards() {
                 const newProj = { 
                     id: generateId(), 
                     name, 
-                    color: colorPalette[state.projects.length % colorPalette.length], 
+                    groupId,
+                    color: groupId ? (state.projectGroups.find(g => g.id === groupId)?.color || colorPalette[state.projects.length % colorPalette.length]) : colorPalette[state.projects.length % colorPalette.length], 
                     milestones: cleanedMilestones,
                     status: 'active'
                 };
