@@ -3091,7 +3091,7 @@ function renderProjectCards() {
                             </div>
                             <div class="flex items-center gap-1 ml-4">
                                 <span class="text-[10px] font-black text-slate-500">納期</span>
-                                <input type="date" value="${st.dueDate || ''}" onchange="handleSubtaskChange('${st.id}', 'dueDate', this.value)" class="text-[11px] font-bold bg-white border-2 border-slate-200 rounded-lg px-1.5 py-1 text-slate-700 focus:border-cyan-500 outline-none w-28 h-7">
+                                <input type="date" value="${st.dueDate || workingTask.dueDate || ''}" onchange="handleSubtaskChange('${st.id}', 'dueDate', this.value)" class="text-[11px] font-bold bg-white border-2 border-slate-200 rounded-lg px-1.5 py-1 text-slate-700 focus:border-cyan-500 outline-none w-28 h-7">
                             </div>
                             <div class="ml-auto flex gap-1">
                                 <button onclick="toggleSubtaskNoteAlt('st-note-${st.id}', 'st-note-icon-${st.id}', '${st.id}')" class="text-slate-400 hover:text-cyan-600 p-2 transition-colors" title="メモを表示">
@@ -3927,14 +3927,15 @@ function renderProjectCards() {
 
                     if (isExp && task.subtasks.length > 0) {
                         task.subtasks.forEach(st => {
+                            const effectiveDueDate = st.dueDate || task.dueDate;
                             let markerHtml = '';
-                            if (st.dueDate) {
-                                const sT = new Date(st.dueDate).setHours(0,0,0,0);
+                            if (effectiveDueDate) {
+                                const sT = new Date(effectiveDueDate).setHours(0,0,0,0);
                                 if (sT >= startDate.getTime() && sT <= endDate.getTime()) {
                                     const offset = Math.max(0, (sT - startDate.getTime()) / (1000*60*60*24));
                                     const left = offset * currentCellWidth;
                                     markerHtml = `
-                                        <div class="absolute w-4 h-4 rounded border-2 border-white shadow-sm z-20 flex items-center justify-center cursor-help bg-fuchsia-500 hover:bg-fuchsia-600 transition-colors" style="left: ${left + (currentCellWidth/2) - 8}px; top: 50%; transform: translateY(-50%);" title="${st.title} (納期: ${st.dueDate})">
+                                        <div class="absolute w-4 h-4 rounded border-2 border-white shadow-sm z-20 flex items-center justify-center cursor-help bg-fuchsia-500 hover:bg-fuchsia-600 transition-colors" style="left: ${left + (currentCellWidth/2) - 8}px; top: 50%; transform: translateY(-50%);" title="${st.title} (納期: ${effectiveDueDate})">
                                             <i class="fa-solid fa-flag text-[8px] text-white"></i>
                                         </div>
                                     `;
@@ -3947,7 +3948,7 @@ function renderProjectCards() {
                                     <div class="flex items-center gap-2.5 overflow-hidden">
                                         <i class="${st.completed ? 'fa-solid fa-square-check text-cyan-500' : 'fa-regular fa-square text-slate-300'} text-xs"></i>
                                         <span class="truncate text-[12px] font-mono font-bold text-slate-500 uppercase ${st.completed ? 'line-through opacity-50' : ''}">${st.title}</span>
-                                        ${st.dueDate ? `<span class="text-[9px] font-black text-fuchsia-600 bg-fuchsia-50 px-1.5 py-0.5 rounded ml-1 border border-fuchsia-100">${st.dueDate.substring(5).replace('-','/')}</span>` : ''}
+                                        ${effectiveDueDate ? `<span class="text-[9px] font-black text-fuchsia-600 bg-fuchsia-50 px-1.5 py-0.5 rounded ml-1 border border-fuchsia-100">${effectiveDueDate.substring(5).replace('-','/')}</span>` : ''}
                                     </div>
                                     <div class="flex gap-2.5 text-[10px] font-mono font-black text-slate-400 uppercase"><span>${st.progress||0}%</span><span>${st.hours}h</span></div>
                                 </div>
