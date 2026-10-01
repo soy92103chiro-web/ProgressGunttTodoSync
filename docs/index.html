@@ -3927,16 +3927,33 @@ function renderProjectCards() {
 
                     if (isExp && task.subtasks.length > 0) {
                         task.subtasks.forEach(st => {
+                            let markerHtml = '';
+                            if (st.dueDate) {
+                                const sT = new Date(st.dueDate).setHours(0,0,0,0);
+                                if (sT >= startDate.getTime() && sT <= endDate.getTime()) {
+                                    const offset = Math.max(0, (sT - startDate.getTime()) / (1000*60*60*24));
+                                    const left = offset * currentCellWidth;
+                                    markerHtml = `
+                                        <div class="absolute w-4 h-4 rounded border-2 border-white shadow-sm z-20 flex items-center justify-center cursor-help bg-fuchsia-500 hover:bg-fuchsia-600 transition-colors" style="left: ${left + (currentCellWidth/2) - 8}px; top: 50%; transform: translateY(-50%);" title="${st.title} (納期: ${st.dueDate})">
+                                            <i class="fa-solid fa-flag text-[8px] text-white"></i>
+                                        </div>
+                                    `;
+                                }
+                            }
+
                             html += `
-                            <div class="flex border-b border-dashed border-slate-200 bg-slate-50/30">
-                                <div style="width: ${currentHeaderWidth}px; min-width: ${currentHeaderWidth}px;" class="py-2 pl-14 pr-4 border-r-2 border-slate-200 ${stickyClass} flex items-center justify-between">
+                            <div class="flex border-b border-dashed border-slate-200 bg-slate-50/30 group">
+                                <div style="width: ${currentHeaderWidth}px; min-width: ${currentHeaderWidth}px;" class="py-2 pl-14 pr-4 border-r-2 border-slate-200 ${stickyClass} flex items-center justify-between group-hover:bg-slate-100/50">
                                     <div class="flex items-center gap-2.5 overflow-hidden">
                                         <i class="${st.completed ? 'fa-solid fa-square-check text-cyan-500' : 'fa-regular fa-square text-slate-300'} text-xs"></i>
                                         <span class="truncate text-[12px] font-mono font-bold text-slate-500 uppercase ${st.completed ? 'line-through opacity-50' : ''}">${st.title}</span>
+                                        ${st.dueDate ? `<span class="text-[9px] font-black text-fuchsia-600 bg-fuchsia-50 px-1.5 py-0.5 rounded ml-1 border border-fuchsia-100">${st.dueDate.substring(5).replace('-','/')}</span>` : ''}
                                     </div>
                                     <div class="flex gap-2.5 text-[10px] font-mono font-black text-slate-400 uppercase"><span>${st.progress||0}%</span><span>${st.hours}h</span></div>
                                 </div>
-                                <div class="flex-1"></div>
+                                <div class="relative flex-1 py-2" style="width: ${totalDays * currentCellWidth}px;">
+                                    ${markerHtml}
+                                </div>
                             </div>`;
                         });                    }
                 });
