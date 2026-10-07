@@ -1937,7 +1937,8 @@ function renderProjectCards() {
                             currentGroupId = p.groupId;
                             const group = state.projectGroups.find(g => g.id === p.groupId);
                             if (group) {
-                                html += `<optgroup label="■ ${group.name}">`;
+                                html += `<optgroup label="📂 ${group.name}">`;
+                                html += `<option value="GROUP_${group.id}" ${currentValue === 'GROUP_' + group.id ? 'selected' : ''} class="font-bold text-cyan-700 bg-cyan-50">📁 ${group.name}（グループ表示）</option>`;
                                 inOptGroup = true;
                             }
                         }
@@ -2022,7 +2023,15 @@ function renderProjectCards() {
 
             state.tasks.filter(t => {
                 if (t.status === 'done') return false;
-                if (pId !== 'all' && t.projectId !== pId) return false;
+                if (pId !== 'all') {
+                    if (pId.startsWith('GROUP_')) {
+                        const groupId = pId.substring(6);
+                        const p = state.projects.find(proj => proj.id === t.projectId);
+                        if (!p || p.groupId !== groupId) return false;
+                    } else {
+                        if (t.projectId !== pId) return false;
+                    }
+                }
                 if (!state.showCompletedProjects && isProjectCompleted(t.projectId)) return false;
                 return true;
             }).forEach(t => {
@@ -2574,7 +2583,7 @@ function renderProjectCards() {
 
         function editCurrentProject() {
             const pid = document.getElementById('kanban-project-filter').value;
-            if (pid === 'all') { showDialog('案内', '編集する案件を選択してください。', 'warning'); return; }
+            if (pid === 'all' || pid.startsWith('GROUP_')) { showDialog('警告', '編集する個別の案件を選択してください（グループは編集できません）', 'warning'); return; }
             editingProjectId = pid;
             openProjectModal(true);
         }
@@ -3012,7 +3021,16 @@ function renderProjectCards() {
                 });
             } else {
                 const pId = document.getElementById('kanban-project-filter')?.value;
-                const targetPId = (pId && pId !== 'all') ? pId : state.projects[0].id;
+                let targetPId = state.projects[0]?.id;
+                if (pId && pId !== 'all') {
+                    if (pId.startsWith('GROUP_')) {
+                        const groupId = pId.substring(6);
+                        const firstProj = state.projects.find(p => p.groupId === groupId && !isProjectCompleted(p.id));
+                        if (firstProj) targetPId = firstProj.id;
+                    } else {
+                        targetPId = pId;
+                    }
+                }
                 workingTask = { id: generateId(), projectId: targetPId, title: '', status: 'todo', dueDate: '', startDate: '', totalHours: 0, memoLogs: [], subtasks: [] };
             }
             renderTaskModalContent();
@@ -3431,7 +3449,15 @@ function renderProjectCards() {
             }
 
             if (pIdFilter !== 'all') {
-                filterTasks = filterTasks.filter(t => t.projectId === pIdFilter);
+                if (pIdFilter.startsWith('GROUP_')) {
+                    const groupId = pIdFilter.substring(6);
+                    filterTasks = filterTasks.filter(t => {
+                        const p = state.projects.find(proj => proj.id === t.projectId);
+                        return p && p.groupId === groupId;
+                    });
+                } else {
+                    filterTasks = filterTasks.filter(t => t.projectId === pIdFilter);
+                }
             } else if (state.kanbanSelectedProjects.size > 0) {
                 filterTasks = filterTasks.filter(t => state.kanbanSelectedProjects.has(t.projectId));
             } else {
@@ -3444,8 +3470,14 @@ function renderProjectCards() {
             }
 
             const relevantProjectIds = new Set();
-            if (pIdFilter !== 'all') relevantProjectIds.add(pIdFilter);
-            else if (state.kanbanSelectedProjects.size > 0) {
+            if (pIdFilter !== 'all') {
+                if (pIdFilter.startsWith('GROUP_')) {
+                    const groupId = pIdFilter.substring(6);
+                    state.projects.filter(p => p.groupId === groupId).forEach(p => relevantProjectIds.add(p.id));
+                } else {
+                    relevantProjectIds.add(pIdFilter);
+                }
+            } else if (state.kanbanSelectedProjects.size > 0) {
                 state.kanbanSelectedProjects.forEach(id => relevantProjectIds.add(id));
             } else {
                 state.projects.forEach(p => {
